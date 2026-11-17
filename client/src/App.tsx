@@ -41,6 +41,7 @@ function TopBar() {
   const nav = useNavigate();
   return (
     <header className="topbar">
+      <div className="topbar-inner">
       <Link to="/" className="wordmark"><img src={wordmark} alt="Rishari" width={129} height={22} /></Link>
       <nav aria-label="Account">
         {user?.isAdmin && <Link to="/admin">Projects</Link>}
@@ -52,6 +53,7 @@ function TopBar() {
           </>
         )}
       </nav>
+      </div>
     </header>
   );
 }

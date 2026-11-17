@@ -12,6 +12,7 @@
   --field-line: #6f757a;  /* input borders, 4.7:1 on white */
   --font: Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
   --measure: 42rem;
+  --shell: 72rem;         /* one content width for the header and every page body */
   --radius-sm: 4px;       /* buttons, inputs, selects, tags, checkboxes */
   --radius-md: 8px;       /* cards, bands, notices, panels */
 }
@@ -47,9 +48,10 @@ h1[tabindex='-1']:focus { outline: none; }
 .skip-link:focus { left: 1rem; top: 1rem; background: var(--white); padding: 0.5rem 1rem; z-index: 10; border: 1px solid var(--black); }
 
 /* Header: wordmark leads (the name must read on first touch) */
-.topbar {
+.topbar { border-bottom: 1px solid var(--hairline); background: var(--white); }
+.topbar-inner {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: 1.1rem 2rem; border-bottom: 1px solid var(--hairline); background: var(--white);
+  max-width: var(--shell); margin: 0 auto; padding: 1.1rem 1.5rem;
 }
 .wordmark { display: block; line-height: 0; }
 .wordmark img { height: 22px; width: auto; }
@@ -58,13 +60,13 @@ h1[tabindex='-1']:focus { outline: none; }
 .topbar nav a:hover { text-decoration: underline; }
 
 .page { max-width: var(--measure); margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
-.page.wide { max-width: 72rem; }
+.page.wide { max-width: var(--shell); }
 .lede { font-size: 1.125rem; line-height: 1.6; }
 .muted { color: var(--caption); }
 .small { font-size: 0.875rem; }
 
 /* Discovery layout */
-.layout { display: grid; grid-template-columns: 16rem 1fr; gap: 4rem; max-width: 70rem; margin: 0 auto; padding: 3rem 1.5rem 6rem; }
+.layout { display: grid; grid-template-columns: 16rem 1fr; gap: 4rem; max-width: var(--shell); margin: 0 auto; padding: 3rem 1.5rem 6rem; }
 .layout > * { min-width: 0; }
 .layout main { max-width: var(--measure); }
 @media (max-width: 860px) {
@@ -183,7 +185,7 @@ details > summary { cursor: pointer; font-weight: 600; font-size: 0.92rem; }
 .demo-bar button[aria-pressed='true'] { background: var(--white); color: var(--black); border-color: var(--white); }
 
 @media (max-width: 600px) {
-  .topbar, .demo-bar { padding-left: 1.25rem; padding-right: 1.25rem; }
+  .topbar-inner, .demo-bar { padding-left: 1.25rem; padding-right: 1.25rem; }
   .topbar .small { display: none; }
   .page { padding-top: 2.25rem; }
 }

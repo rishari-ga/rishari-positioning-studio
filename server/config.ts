@@ -37,10 +37,19 @@ export const config = {
     maxBytes: Number(process.env.UPLOAD_MAX_BYTES ?? 10 * 1024 * 1024),
   },
   ai: {
-    // Runtime AI is wired up in Pass 2. Kept here so the setting exists from day one.
+    // Off unless AI_ENABLED=true and a key is set. Client answers never depend on AI being available.
     enabled: process.env.AI_ENABLED === 'true',
+    apiKey: process.env.OPENAI_API_KEY ?? '',
     intakeModel: process.env.INTAKE_MODEL ?? 'gpt-5.4-mini',
     strategyModel: process.env.STRATEGY_MODEL ?? 'gpt-5.4',
+    // Spending caps in US cents, counted per calendar month (UTC).
+    projectMonthlyCapCents: Math.round(Number(process.env.AI_PROJECT_MONTHLY_CAP_USD ?? 15) * 100),
+    totalMonthlyCapCents: Math.round(Number(process.env.AI_TOTAL_MONTHLY_CAP_USD ?? 150) * 100),
+    // USD per million tokens [input, output], from OpenAI's published pricing. Used to estimate cost per job.
+    prices: {
+      'gpt-5.4': [2.5, 15],
+      'gpt-5.4-mini': [0.75, 4.5],
+    } as Record<string, [number, number]>,
   },
 };
 

@@ -74,6 +74,8 @@ export type Content = {
   links?: SolutionLink[];
   connectionReviews?: ConnectionReview[];
   earlierAnswers?: { questionKey: string; prompt: string; offerName: string | null; value: unknown }[];
+  followups?: { questionKey: string; offerId: string | null; personaId: string | null; round: number; question: string; answer: string | null; status: string }[];
+  summaries?: { moduleKey: string; summary: string; interpretations: string[]; openQuestions: string[]; clientCorrection: string | null }[];
 };
 
 type Scope = { offerId?: string | null; personaId?: string | null };

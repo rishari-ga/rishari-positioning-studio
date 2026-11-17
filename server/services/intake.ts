@@ -450,6 +450,12 @@ export async function buildIntakeContent(projectId: string, db: Db) {
   const earlier = (await earlierAnswers(projectId, db)).map((e) => ({ questionKey: e.question_key, prompt: e.prompt, offerName: e.offer_name, value: e.value }));
   const offers = (await db.query(`SELECT id, name, description, intended_customer, availability, pricing_approach, delivery_model, priority, in_scope
                                   FROM offers WHERE project_id=$1 AND deleted_at IS NULL ORDER BY sort_order, created_at`, [projectId])).rows;
+  // AI follow-ups and chapter summaries travel with the snapshot, kept separate from the original answers.
+  const followups = (await db.query(`SELECT q.key AS "questionKey", f.offer_id AS "offerId", f.persona_id AS "personaId", f.round, f.question, f.answer, f.status
+                                     FROM ai_followups f JOIN questions q ON q.id=f.question_id WHERE f.project_id=$1 ORDER BY f.created_at`, [projectId])).rows;
+  const summaries = (await db.query(`SELECT m.key AS "moduleKey", s.content, s.client_correction FROM summaries s JOIN question_modules m ON m.id=s.module_id WHERE s.project_id=$1`, [projectId])).rows
+    .filter((r) => r.content && typeof r.content.summary === 'string')
+    .map((r) => ({ moduleKey: r.moduleKey, summary: r.content.summary, interpretations: r.content.interpretations ?? [], openQuestions: r.content.openQuestions ?? [], clientCorrection: r.client_correction }));
   const progress = (await db.query('SELECT module_id, marked_for_discussion, client_correction FROM module_progress WHERE project_id=$1', [projectId])).rows;
   const attachments = (await db.query('SELECT id, module_id, original_name, mime_type, size_bytes FROM attachments WHERE project_id=$1 AND deleted_at IS NULL', [projectId])).rows;
   const stakeholders = (await db.query(`SELECT id, offer_id, label, roles, desired_outcome, wants_to_prevent, needs_to_believe, decision_role, evidence_status
@@ -483,6 +489,8 @@ export async function buildIntakeContent(projectId: string, db: Db) {
     links,
     connectionReviews,
     earlierAnswers: earlier,
+    followups,
+    summaries,
   };
 }
 

@@ -10,6 +10,7 @@ import { h, errorHandler, HttpError } from './http.js';
 import { authMiddleware, requireUser } from './auth/identity.js';
 import { requireAdmin, requireProjectAccess, requireClientMember, assertUuid } from './services/permissions.js';
 import * as projects from './services/projects.js';
+import * as ai from './services/ai.js';
 import * as intake from './services/intake.js';
 import * as files from './services/attachments.js';
 import * as admin from './services/admin.js';
@@ -221,6 +222,25 @@ export function createApp() {
     res.send(body);
   }));
 
+  // ---- AI-assisted client features (Pass 2). Failures never block the client. ----
+  pr.get('/followups', h(async (req, res) => {
+    const user = requireUser(req); await requireProjectAccess(user, req.params.pid);
+    res.json(await ai.listFollowups(req.params.pid));
+  }));
+  pr.post('/followups/next', rateLimit(30, 60_000), h(async (req, res) => {
+    res.json(await ai.nextFollowup(requireUser(req), req.params.pid, ai.followupRequest.parse(req.body)));
+  }));
+  pr.put('/followups/:fid', h(async (req, res) => {
+    assertUuid(req.params.fid);
+    res.json(await ai.answerFollowup(requireUser(req), req.params.pid, req.params.fid, ai.followupAnswer.parse(req.body)));
+  }));
+  pr.get('/summaries/:moduleKey', rateLimit(40, 60_000), h(async (req, res) => {
+    res.json(await ai.chapterSummary(requireUser(req), req.params.pid, req.params.moduleKey, req.query.generate === '1'));
+  }));
+  pr.put('/summaries/:moduleKey/correction', h(async (req, res) => {
+    res.json(await ai.correctSummary(requireUser(req), req.params.pid, req.params.moduleKey, ai.summaryCorrection.parse(req.body).correction));
+  }));
+
   // ---- Admin routes ----------------------------------------------------------
   const ad = express.Router();
   app.use('/api/admin', ad);
@@ -289,6 +309,31 @@ export function createApp() {
 
   ad.get('/guidance', h(async (req, res) => { res.json(await narrative.listGuidance(req.user!)); }));
   ad.put('/guidance/:key', h(async (req, res) => { await narrative.updateGuidance(req.user!, req.params.key, narrative.guidanceInput.parse(req.body)); res.json({ ok: true }); }));
+
+  // ---- AI-assisted review and strategy (Pass 2). Every generation is an explicit admin action. ----
+  const aiLimit = rateLimit(config.nodeEnv === 'test' ? 10_000 : 12, 60_000);
+  const pid = (req: express.Request) => { assertUuid(req.params.pid); return req.params.pid; };
+  ad.get('/projects/:pid/ai', h(async (req, res) => { res.json(await ai.aiOverview(req.user!, pid(req))); }));
+  ad.post('/projects/:pid/ai-review', aiLimit, h(async (req, res) => { res.json(await ai.aiReview(req.user!, pid(req))); }));
+  ad.get('/projects/:pid/briefing', h(async (req, res) => { res.json(await ai.getBriefing(req.user!, pid(req))); }));
+  ad.post('/projects/:pid/briefing', aiLimit, h(async (req, res) => { res.json(await ai.generateBriefing(req.user!, pid(req))); }));
+  ad.put('/projects/:pid/briefing/:bid', h(async (req, res) => {
+    assertUuid(req.params.bid);
+    res.json(await ai.saveBriefing(req.user!, pid(req), req.params.bid, ai.briefingEdit.parse(req.body).content));
+  }));
+  ad.get('/projects/:pid/strategy', h(async (req, res) => { res.json(await ai.strategyState(req.user!, pid(req))); }));
+  ad.post('/projects/:pid/strategy/options', aiLimit, h(async (req, res) => { res.json(await ai.generateOptions(req.user!, pid(req))); }));
+  ad.post('/projects/:pid/strategy/direction', h(async (req, res) => { res.json(await ai.approveDirection(req.user!, pid(req), ai.directionInput.parse(req.body))); }));
+  ad.post('/projects/:pid/strategy/draft', aiLimit, h(async (req, res) => { res.json(await ai.draftFramework(req.user!, pid(req))); }));
+  ad.post('/projects/:pid/strategy/check', aiLimit, h(async (req, res) => { res.json(await ai.checkFramework(req.user!, pid(req))); }));
+  ad.put('/projects/:pid/strategy/sections/:sid', h(async (req, res) => {
+    assertUuid(req.params.sid);
+    res.json(await ai.editSection(req.user!, pid(req), req.params.sid, ai.sectionEdit.parse(req.body)));
+  }));
+  ad.post('/projects/:pid/strategy/sections/:sid/revise', aiLimit, h(async (req, res) => {
+    assertUuid(req.params.sid);
+    res.json(await ai.reviseSection(req.user!, pid(req), req.params.sid, ai.reviseInput.parse(req.body).instruction));
+  }));
   ad.get('/data-use', h(async (_req, res) => { res.json(await admin.getDataUse()); }));
   ad.put('/data-use', h(async (req, res) => { await admin.saveDataUse(req.user!, req.body); res.json({ ok: true }); }));
 

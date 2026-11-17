@@ -85,7 +85,7 @@ export function NarrativeTab() {
 
 type Flag = {
   id: string; issue: string; priority: string; source_refs: { questionKey: string; offerId: string | null; prompt: string }[]; noticed: string; suggested_action: string;
-  example: string | null; why: string | null; client_question: string | null; decision: string | null; reviewer_note: string | null; offer_name: string | null; persona_name: string | null; check_key: string | null;
+  example: string | null; why: string | null; client_question: string | null; decision: string | null; reviewer_note: string | null; offer_name: string | null; persona_name: string | null; check_key: string | null; origin?: 'rule' | 'ai';
 };
 const DECISIONS: [string, string][] = [['accepted', 'Accept'], ['agenda', 'Add to agenda'], ['clarification_requested', 'Request clarification'], ['assumption', 'Mark as assumption'], ['resolved', 'Resolve'], ['dismissed', 'Dismiss']];
 
@@ -98,12 +98,20 @@ export function FlagsTab() {
   if (!flags) return <p className="muted">Loading...</p>;
   return (
     <>
-      <p className="muted small">Run the checks after the client submits, or any time you want a fresh look. These checks follow fixed rules and use no AI. They point to answers worth a closer look; a strategist decides what each one means.</p>
-      <p><button onClick={async () => { const r = await api<{ found: number; created: number }>(`/api/admin/projects/${pid}/checks`, { method: 'POST' }); setMsg(`Checks found ${r.found} item${r.found === 1 ? '' : 's'}; ${r.created} new.`); load(); }}>Run checks</button> <span role="status" className="small">{msg}</span></p>
+      <p className="muted small">Run the checks after the client submits, or any time you want a fresh look. <strong>Rule checks</strong> follow fixed rules and use no AI. <strong>AI review</strong> reads the latest submitted version for contradictions, vague or unsupported claims, and missing links. Both only point to answers worth a closer look; a strategist decides what each one means.</p>
+      <p>
+        <button onClick={async () => { setMsg('Running rule checks...'); const r = await api<{ found: number; created: number }>(`/api/admin/projects/${pid}/checks`, { method: 'POST' }); setMsg(`Rule checks found ${r.found} item${r.found === 1 ? '' : 's'}; ${r.created} new.`); load(); }}>Run rule checks</button>{' '}
+        <button className="secondary" onClick={async () => {
+          setMsg('AI review running. This can take up to a minute...');
+          try { const r = await api<{ found: number; created: number }>(`/api/admin/projects/${pid}/ai-review`, { method: 'POST' }); setMsg(`AI review found ${r.found} item${r.found === 1 ? '' : 's'}; ${r.created} new.`); load(); }
+          catch (x) { setMsg((x as Error).message); }
+        }}>Run AI review</button>{' '}
+        <span role="status" className="small">{msg}</span>
+      </p>
       {flags.length === 0 && <p className="muted">No flags yet.</p>}
       {flags.map((f) => (
         <article key={f.id} className="card" style={f.decision === 'dismissed' || f.decision === 'resolved' ? { opacity: 0.6 } : undefined}>
-          <p className="eyebrow" style={{ marginBottom: '0.3rem' }}>{f.priority} priority{f.persona_name ? ` · Persona: ${f.persona_name}` : ''}{f.offer_name ? ` · ${f.offer_name}` : ''}</p>
+          <p className="eyebrow" style={{ marginBottom: '0.3rem' }}>{f.origin === 'ai' ? 'AI review · ' : ''}{f.priority} priority{f.persona_name ? ` · Persona: ${f.persona_name}` : ''}{f.offer_name ? ` · ${f.offer_name}` : ''}</p>
           <h2 style={{ marginTop: 0 }}>{f.issue}{f.decision && <span className="tag">{DECISIONS.find((d) => d[0] === f.decision)?.[1] ?? f.decision}</span>}</h2>
           <p><strong>What we noticed.</strong> {f.noticed}</p>
           <p><strong>Suggested action.</strong> {f.suggested_action}</p>

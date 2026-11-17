@@ -208,3 +208,13 @@ pre.brief { white-space: pre-wrap; font-family: inherit; font-size: 0.875rem; ba
 .card.danger { border-color: #b3261e; }
 button.danger { background: #b3261e; border-color: #b3261e; color: #fff; }
 button.danger:disabled { opacity: 0.45; }
+.followups { margin-top: 0.75rem; }
+.followup { border-left: 3px solid #00ccff; background: var(--grey); border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-top: 0.6rem; }
+.followup.done { border-left-color: var(--hairline); }
+.followup textarea { margin-top: 0.4rem; }
+.summary-box { background: var(--grey); border-radius: var(--radius-md); padding: 1rem 1.1rem; margin-bottom: 1rem; }
+ol.steps { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; padding-left: 1.2rem; }
+ol.steps li.done { font-weight: 600; }
+ol.steps li.done::marker { color: #0077a3; }
+button.link:disabled { opacity: 0.4; cursor: not-allowed; }
+textarea[id^="br-"], textarea[aria-label^="Priority"] { min-height: 3.5rem; }

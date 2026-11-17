@@ -6,6 +6,7 @@ import { findAnswer } from '../api';
 import type { Answer, Question, Discovery, Module, FocusOffer } from '../api';
 import { renderPrompt, EVIDENCE_OPTIONS, PURCHASE_ROLES, FIT_OPTIONS } from '@shared/narrative';
 import { priorityPersonas } from '../api';
+import { ChapterSummary } from './Followups';
 import type { Persona } from '../api';
 import { useDiscovery } from './ProjectRoutes';
 import { ChapterMap, SaveIndicator, stepIndexFor, ClarificationBanner } from './ModulePage';
@@ -47,7 +48,7 @@ export function ReviewPage() {
           return (
             <section key={m.id} className="card" aria-labelledby={`rv-${m.key}`}>
               <h2 id={`rv-${m.key}`}>{m.title}</h2>
-              <p className="small muted">Summary: an organized summary will appear here once AI-assisted review is turned on. Your original answers below are what we'll review.</p>
+              <ChapterSummary pid={d.project.id} moduleKey={m.key} />
               <ModuleAnswers d={d} m={m} linkBase={`/p/${d.project.id}`} />
               <ModuleControls moduleKey={m.key} marked={prog?.marked_for_discussion ?? false} correction={prog?.client_correction ?? ''} onChange={reload} />
             </section>
@@ -91,7 +92,7 @@ function ModuleControls({ moduleKey, marked, correction, onChange }: { moduleKey
         {marked ? 'Marked for discussion' : 'Mark for discussion'}
       </button>
       <div className="field" style={{ marginTop: '1rem', marginBottom: 0 }}>
-        <label htmlFor={`corr-${moduleKey}`}>Anything to correct or add for this chapter? (optional)</label>
+        <label htmlFor={`corr-${moduleKey}`}>Anything to correct in our summary, or to add for this chapter? (optional)</label>
         <textarea id={`corr-${moduleKey}`} rows={2} value={text} onChange={(e) => setText(e.target.value)}
           onBlur={() => { if (text !== correction) save({ clientCorrection: text || null }); }} />
       </div>

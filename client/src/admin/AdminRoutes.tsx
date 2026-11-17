@@ -4,6 +4,7 @@ import { api } from '../api';
 import type { Discovery, Offer } from '../api';
 import { ModuleAnswers } from '../client/ReviewPage';
 import { NarrativeTab, FlagsTab, SourceApprovalTab, GuidanceEditor, ConnectionsTab } from './Narrative';
+import { BriefingTab, StrategyTab, AiUsage } from './Strategy';
 
 export function AdminRoutes() {
   return (
@@ -96,7 +97,9 @@ function ProjectAdmin() {
         <NavLink to={`${base}/flags`}>Flags</NavLink>
         <NavLink to={`${base}/offers`}>Offers and scope</NavLink>
         <NavLink to={`${base}/notes`}>Notes</NavLink>
+        <NavLink to={`${base}/briefing`}>Briefing</NavLink>
         <NavLink to={`${base}/approval`}>Source approval</NavLink>
+        <NavLink to={`${base}/strategy`}>Strategy</NavLink>
         <NavLink to={`${base}/activity`}>Activity</NavLink>
       </nav>
       <Routes>
@@ -106,6 +109,8 @@ function ProjectAdmin() {
         <Route path="narrative" element={<NarrativeTab />} />
         <Route path="flags" element={<FlagsTab />} />
         <Route path="approval" element={<SourceApprovalTab />} />
+        <Route path="briefing" element={<BriefingTab />} />
+        <Route path="strategy" element={<StrategyTab />} />
         <Route path="offers" element={<OffersTab />} />
         <Route path="notes" element={<NotesTab />} />
         <Route path="activity" element={<ActivityTab />} />
@@ -149,6 +154,7 @@ function OverviewTab({ o, reload }: { o: Overview; reload: () => void }) {
         <p>Process acknowledgment: {o.acknowledgment ? `${o.acknowledgment.ack_version}, ${new Date(o.acknowledgment.created_at).toLocaleString()}` : 'Not yet'}</p>
         <p>Submitted versions: {o.snapshots.length ? o.snapshots.map((s) => `v${s.version} (${new Date(s.created_at).toLocaleDateString()})`).join(', ') : 'None yet'}</p>
       </section>
+      <AiUsage pid={o.project.id} />
       <DeleteProject o={o} />
     </>
   );

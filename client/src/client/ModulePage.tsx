@@ -8,6 +8,7 @@ import { renderPrompt, fill, EVIDENCE_OPTIONS, PURCHASE_ROLES, FIT_OPTIONS, TERM
 import { useDiscovery } from './ProjectRoutes';
 import { useAutosave } from './useAutosave';
 import type { Draft, SaveStatus } from './useAutosave';
+import { FollowupBox } from './Followups';
 
 export type Step =
   | { kind: 'fields'; questions: Question[] }
@@ -303,6 +304,10 @@ function QuestionEditor({ q, offer, persona, compact }: { q: Question; offer: Fo
   const onSaved = useCallback((rev: number, dr: Draft) => patchAnswer({ questionId: q.id, offerId, personaId, revision: rev, value: dr.value, status: dr.status, contextNote: dr.contextNote, evidenceStatus: dr.evidenceStatus ?? null, reusedFromKey: dr.reusedFromKey ?? null }), [patchAnswer, q.id, offerId, personaId]);
   const { draft, setDraft, status, error, flush, retry } = useAutosave(d.project.id, q.key, offerId, personaId, initial, existing?.revision ?? 0, onSaved);
   const [reuseDismissed, setReuseDismissed] = useState(false);
+  const [ask, setAsk] = useState(0);
+  const wantsFollowups = q.kind === 'core' && q.input_type === 'long_text';
+  // After the client finishes an answer (leaves the box), save it, then see whether one more detail would help.
+  const doneEditing = async () => { await flush(); if (wantsFollowups) setAsk((n) => n + 1); };
   const found = useReuse(q);
   const id = `q-${q.key}${offerId ? `-${offerId.slice(0, 8)}` : ''}${personaId ? `-${personaId.slice(0, 8)}` : ''}`;
   const helpId = q.help_text ? `${id}-help` : undefined;
@@ -330,7 +335,7 @@ function QuestionEditor({ q, offer, persona, compact }: { q: Question; offer: Fo
       break;
     case 'long_text':
       input = <textarea id={id} value={(draft.value as string) ?? ''} aria-describedby={helpId} rows={compact ? 3 : 7}
-        onChange={(e) => setValue(e.target.value)} onBlur={() => flush()} disabled={draft.status === 'not_applicable'} />;
+        onChange={(e) => setValue(e.target.value)} onBlur={() => { void doneEditing(); }} disabled={draft.status === 'not_applicable'} />;
       break;
     case 'single_select':
       input = <select id={id} value={(draft.value as string) ?? ''} onChange={(e) => setValue(e.target.value || null, true)} aria-describedby={helpId}>
@@ -394,6 +399,7 @@ function QuestionEditor({ q, offer, persona, compact }: { q: Question; offer: Fo
         </div>
       )}
       <SaveIndicator status={status} error={error} onRetry={retry} />
+      {wantsFollowups && draft.status === 'answered' && <FollowupBox pid={d.project.id} questionKey={q.key} offerId={offerId} personaId={personaId} ask={ask} />}
     </div>
   );
 }

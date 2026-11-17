@@ -43,7 +43,7 @@ export async function usage(projectId: string | null) {
 
 function costCents(model: string, input: number | null, output: number | null): number | null {
   const base = Object.keys(config.ai.prices).find((k) => model === k || model.startsWith(`${k}-`));
-  if (!base || input == null || output == null) return null;
+  if (!base || input == null || output == null || (input === 0 && output === 0)) return null;
   const [pi, po] = config.ai.prices[base];
   return Math.max(1, Math.ceil(((input * pi + output * po) / 1_000_000) * 100));
 }

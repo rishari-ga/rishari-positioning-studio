@@ -16,7 +16,7 @@ function useRun() {
   return { busy, msg, run, setMsg };
 }
 const Status = ({ busy, msg }: { busy: string; msg: string }) => (
-  <p role="status" className="small" style={{ minHeight: '1.2em' }}>{busy ? `${busy} This can take a minute. You can leave this page; the result is saved.` : msg}</p>
+  <p role="status" className="small" style={{ minHeight: '1.2em' }}>{busy ? `${busy} You can leave this page; the result is saved when it finishes.` : msg}</p>
 );
 // Plain markdown: paragraphs, lists, bold. Rendered as text, never as HTML.
 function Md({ text }: { text: string }) {
@@ -101,7 +101,7 @@ export function BriefingTab() {
   return (
     <>
       <p className="muted small">An internal briefing for your call. The client never sees it. It's prepared by an AI-assisted tool from the latest submitted answers, open flags, and your notes. Edit anything, and reorder the priorities.</p>
-      <p><button disabled={!!busy} onClick={() => { setMsg(''); run('Preparing the briefing...', () => api(`/api/admin/projects/${pid}/briefing`, { method: 'POST' }).then(load), 'Briefing ready.'); }}>{b ? 'Prepare a fresh briefing' : 'Prepare briefing'}</button></p>
+      <p><button disabled={!!busy} onClick={() => { setMsg(''); run('Preparing the briefing (under a minute)...', () => api(`/api/admin/projects/${pid}/briefing`, { method: 'POST' }).then(load), 'Briefing ready.'); }}>{b ? 'Prepare a fresh briefing' : 'Prepare briefing'}</button></p>
       <Status busy={busy} msg={msg} />
       {!b || !draft ? <p className="muted">No briefing yet.</p> : (
         <>
@@ -181,7 +181,7 @@ export function StrategyTab() {
       <section className="card">
         <h2>1. Positioning options</h2>
         <p className="small muted">Two or three distinct directions, drafted from the approved source only.</p>
-        <button disabled={!st.sourceApproved || !!busy} onClick={() => run('Developing options...', () => api(`/api/admin/projects/${pid}/strategy/options`, { method: 'POST' }).then(load), 'Options ready.')}>{current.length ? 'Develop new options' : 'Develop options'}</button>
+        <button disabled={!st.sourceApproved || !!busy} onClick={() => run('Developing options (about 2 minutes)...', () => api(`/api/admin/projects/${pid}/strategy/options`, { method: 'POST' }).then(load), 'Options ready.')}>{current.length ? 'Develop new options' : 'Develop options'}</button>
         {current[0]?.content.unresolvedDecisions?.length ? (
           <div className="card" style={{ background: 'var(--grey)', border: 0, marginTop: '1rem' }}>
             <p className="small" style={{ fontWeight: 600, marginBottom: '0.3rem' }}>Unresolved decisions</p>
@@ -195,8 +195,8 @@ export function StrategyTab() {
         <h2>2. Framework</h2>
         {chosen && <p className="small">Direction: <strong>{(chosen.edited_content ?? chosen.content).name}</strong>, approved by {st.direction!.actor_email} on {new Date(st.direction!.created_at).toLocaleDateString()}{!st.directionCurrent && <strong> · Out of date: choose a direction again.</strong>}</p>}
         <p>
-          <button disabled={!st.directionCurrent || !!busy} onClick={() => run('Drafting the framework (three passes, then a review)...', () => api(`/api/admin/projects/${pid}/strategy/draft`, { method: 'POST' }).then(load), 'Draft ready.')}>{st.version ? 'Draft a new version' : 'Draft framework'}</button>{' '}
-          {st.version && <button className="secondary" disabled={!st.directionCurrent || !!busy} onClick={() => run('Reviewing the draft...', () => api(`/api/admin/projects/${pid}/strategy/check`, { method: 'POST' }).then(load), 'Review done.')}>Re-run consistency review</button>}
+          <button disabled={!st.directionCurrent || !!busy} onClick={() => run('Drafting the framework: three passes, then a review (about 10 minutes)...', () => api(`/api/admin/projects/${pid}/strategy/draft`, { method: 'POST' }).then(load), 'Draft ready.')}>{st.version ? 'Draft a new version' : 'Draft framework'}</button>{' '}
+          {st.version && <button className="secondary" disabled={!st.directionCurrent || !!busy} onClick={() => run('Reviewing the draft (about 1 minute)...', () => api(`/api/admin/projects/${pid}/strategy/check`, { method: 'POST' }).then(load), 'Review done.')}>Re-run consistency review</button>}
         </p>
         {st.version && <p className="small muted">Version {st.version.version} from source v{st.version.source_version}, {new Date(st.version.created_at).toLocaleString()}. Locked sections are kept as-is when you draft a new version. Draft, not shared.</p>}
       </section>
@@ -266,7 +266,7 @@ function SectionCard({ pid, s, canRevise, onChange }: { pid: string; s: Section;
         <div className="field">
           <label htmlFor={`ri-${s.id}`}>What should change?</label>
           <textarea id={`ri-${s.id}`} rows={2} value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="For example: lead with the cost of late files, and keep it under 60 words." />
-          <p><button disabled={instruction.trim().length < 3 || !!busy} onClick={() => run('Rewriting this section...', () => api(`/api/admin/projects/${pid}/strategy/sections/${s.id}/revise`, { method: 'POST', json: { instruction } }).then(() => { setMode('view'); setInstruction(''); onChange(); }))}>Regenerate section</button>{' '}<button className="secondary" onClick={() => setMode('view')}>Cancel</button></p>
+          <p><button disabled={instruction.trim().length < 3 || !!busy} onClick={() => run('Rewriting this section (about 1 minute)...', () => api(`/api/admin/projects/${pid}/strategy/sections/${s.id}/revise`, { method: 'POST', json: { instruction } }).then(() => { setMode('view'); setInstruction(''); onChange(); }))}>Regenerate section</button>{' '}<button className="secondary" onClick={() => setMode('view')}>Cancel</button></p>
         </div>
       )}
       {s.content.claims.length > 0 && (

@@ -237,7 +237,7 @@ describe('Test 21 (partial): seeded application text contains no em dashes', () 
     const content = await import('../shared/content.js');
     const dbText = (await pool.query("SELECT string_agg(prompt || coalesce(help_text,''), ' ') AS t FROM question_versions")).rows[0].t;
     for (const t of [JSON.stringify(MODULES), JSON.stringify(DATA_USE_DEFAULT), JSON.stringify(content), dbText]) {
-      expect(t.includes('—')).toBe(false);
+      expect(t.includes('\u2014')).toBe(false);
     }
   });
 });

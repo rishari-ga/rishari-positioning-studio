@@ -133,7 +133,7 @@ export const guidanceInput = z.object({
 });
 export async function updateGuidance(admin: CurrentUser, key: string, input: z.infer<typeof guidanceInput>) {
   requireAdmin(admin);
-  if (/[–—]/.test(Object.values(input).join(' '))) throw new HttpError(400, 'em_dash', 'Please remove em and en dashes. Use a period, comma, or parentheses.');
+  if (/[\u2013\u2014]/.test(Object.values(input).join(' '))) throw new HttpError(400, 'em_dash', 'Please remove em and en dashes. Use a period, comma, or parentheses.');
   const r = await pool.query('UPDATE guidance_entries SET issue=$2, action=$3, example=$4, why=$5, client_question=$6, updated_at=now() WHERE key=$1 RETURNING key',
     [key, input.issue, input.action, input.example, input.why, input.clientQuestion]);
   if (!r.rows[0]) throw notFound();

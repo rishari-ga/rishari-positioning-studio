@@ -257,12 +257,12 @@ describe('buyer narrative', () => {
     const admin = await as(ADMIN);
     const g = (await admin.get('/api/admin/guidance').expect(200)).body;
     expect(g).toHaveLength(18);
-    expect(JSON.stringify(g)).not.toMatch(/[–—]/);
+    expect(JSON.stringify(g)).not.toMatch(/[\u2013\u2014]/);
     const one = g.find((x: { key: string }) => x.key === 'success_only_functionality');
     expect(one.example).toContain("'Automated reminders' describes a capability.");
-    await admin.put('/api/admin/guidance/success_only_functionality').send({ issue: 'A — B', action: 'a', example: 'b', why: 'c', clientQuestion: 'd' }).expect(400);
+    await admin.put('/api/admin/guidance/success_only_functionality').send({ issue: 'A \u2014 B', action: 'a', example: 'b', why: 'c', clientQuestion: 'd' }).expect(400);
     const qs = (await pool.query('SELECT prompt, planned_prompt, help_text FROM question_versions')).rows;
-    expect(JSON.stringify(qs)).not.toMatch(/[–—]/);
+    expect(JSON.stringify(qs)).not.toMatch(/[\u2013\u2014]/);
   });
 });
 

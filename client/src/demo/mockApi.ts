@@ -255,7 +255,7 @@ async function handle(method: string, path: string, body: unknown, query: URLSea
     }
     if (path === '/api/admin/guidance') return state.guidance;
     if ((m = path.match(/^\/api\/admin\/guidance\/(.+)$/))) {
-      if (/[–—]/.test(Object.values(b).join(' '))) throw new HttpErr(400, 'Please remove em and en dashes. Use a period, comma, or parentheses.');
+      if (/[\u2013\u2014]/.test(Object.values(b).join(' '))) throw new HttpErr(400, 'Please remove em and en dashes. Use a period, comma, or parentheses.');
       const g = state.guidance.find((x: Json) => x.key === m![1]);
       if (g) Object.assign(g, { issue: b.issue, action: b.action, example: b.example, why: b.why, client_question: b.clientQuestion });
       save(); return { ok: true };

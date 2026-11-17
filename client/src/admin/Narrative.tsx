@@ -108,7 +108,7 @@ export function FlagsTab() {
         }}>Run AI review</button>{' '}
         <span role="status" className="small">{msg}</span>
       </p>
-      {flags.length === 0 && <p className="muted">No flags yet.</p>}
+      {flags.length === 0 && <p className="muted">Nothing flagged. Run a check when they submit.</p>}
       {flags.map((f) => (
         <article key={f.id} className="card" style={f.decision === 'dismissed' || f.decision === 'resolved' ? { opacity: 0.6 } : undefined}>
           <p className="eyebrow" style={{ marginBottom: '0.3rem' }}>{f.origin === 'ai' ? 'AI review · ' : ''}{f.priority} priority{f.persona_name ? ` · Persona: ${f.persona_name}` : ''}{f.offer_name ? ` · ${f.offer_name}` : ''}</p>
@@ -260,8 +260,7 @@ export function GuidanceEditor() {
   const set = (i: number, k: keyof Guidance, v: string) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   return (
     <main className="page wide" id="main">
-      <p className="eyebrow"><Link to="/admin" style={{ color: 'inherit' }}>All projects</Link></p>
-      <h1>Guidance library</h1>
+      <h1 className="admin-title">Guidance library</h1>
       <p className="muted">The explanations, examples, and client questions that flags use. Edits apply to new flags.</p>
       {rows.map((g, i) => (
         <form key={g.key} className="card" onSubmit={async (e) => {

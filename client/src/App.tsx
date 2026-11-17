@@ -39,6 +39,8 @@ export function App({ authMode }: { authMode: 'clerk' | 'dev' }) {
 function TopBar() {
   const { user, authMode, refresh } = useSession();
   const nav = useNavigate();
+  const loc = useLocation();
+  if (loc.pathname.startsWith('/admin')) return null; // the team workspace has its own black rail
   return (
     <header className="topbar">
       <div className="topbar-inner">

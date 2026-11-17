@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { Link, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Discovery, Offer } from '../api';
 import { ModuleAnswers } from '../client/ReviewPage';
 import { NarrativeTab, FlagsTab, SourceApprovalTab, GuidanceEditor, ConnectionsTab } from './Narrative';
 import { BriefingTab, StrategyTab, AiUsage } from './Strategy';
+import { AdminShell } from './Shell';
 
 export function AdminRoutes() {
   return (
+    <AdminShell>
     <Routes>
       <Route index element={<ProjectList />} />
       <Route path="data-use" element={<DataUseEditor />} />
       <Route path="guidance" element={<GuidanceEditor />} />
       <Route path="p/:pid/*" element={<ProjectAdmin />} />
     </Routes>
+    </AdminShell>
   );
 }
 
@@ -50,10 +53,9 @@ function ProjectList() {
   useEffect(() => { load(); const t = setInterval(load, 60_000); return () => clearInterval(t); }, [load]);
   return (
     <main className="page wide" id="main">
-      <p className="eyebrow">Rishari review</p>
-      <h1>Projects</h1>
-      <p className="small"><Link to="/admin/data-use">Edit the data-use page</Link> &middot; <Link to="/admin/guidance">Edit the guidance library</Link></p>
-      {!rows ? <p className="muted">Loading...</p> : rows.length === 0 ? <p className="muted">No projects yet.</p> : (
+      <h1 className="admin-title">Every client. Every stage.</h1>
+      <p className="muted">Where each project stands, who's active, and what needs you next.</p>
+      {!rows ? <p className="muted">Loading...</p> : rows.length === 0 ? <p className="muted">No projects yet. Start one below.</p> : (
         <table>
           <thead><tr><th>Project</th><th>Stage</th><th>Discovery</th><th>Open flags</th><th>Last active</th><th>Client</th></tr></thead>
           <tbody>{rows.map((r) => (
@@ -94,13 +96,6 @@ type Overview = {
   snapshots: { id: string; version: number; kind: string; created_at: string }[];
 };
 
-// Project views grouped by the order the work happens in.
-const NAV: [string, [string, string][]][] = [
-  ['Discovery', [['', 'Overview'], ['answers', 'Answers'], ['connections', 'Connections'], ['narrative', 'Coverage']]],
-  ['Review', [['flags', 'Flags'], ['notes', 'Notes'], ['briefing', 'Briefing']]],
-  ['Strategy', [['approval', 'Source approval'], ['strategy', 'Strategy']]],
-  ['Setup', [['offers', 'Offers and scope'], ['activity', 'Activity']]],
-];
 
 function ProjectAdmin() {
   const { pid } = useParams();
@@ -111,17 +106,7 @@ function ProjectAdmin() {
   const base = `/admin/p/${pid}`;
   return (
     <main className="page wide" id="main">
-      <p className="eyebrow"><Link to="/admin" style={{ color: 'inherit' }}>All projects</Link></p>
-      <h1>{o.project.company_name || o.project.name} {o.project.is_fictional && <span className="fictional">Fictional</span>}</h1>
-      <div className="admin-shell">
-      <nav className="side-nav" aria-label="Project views">
-        {NAV.map(([group, items]) => (
-          <div key={group} className="side-group">
-            <p className="side-label">{group}</p>
-            {items.map(([path, label]) => <NavLink key={path} end={path === ''} to={path ? `${base}/${path}` : base}>{label}</NavLink>)}
-          </div>
-        ))}
-      </nav>
+      <h1 className="admin-title">{o.project.company_name || o.project.name} {o.project.is_fictional && <span className="fictional">Fictional</span>}</h1>
       <div className="admin-body">
       <Routes>
         <Route index element={<OverviewTab o={o} reload={load} />} />
@@ -136,7 +121,6 @@ function ProjectAdmin() {
         <Route path="notes" element={<NotesTab />} />
         <Route path="activity" element={<ActivityTab />} />
       </Routes>
-      </div>
       </div>
     </main>
   );
@@ -191,11 +175,11 @@ function Dashboard({ pid }: { pid: string }) {
   const openFlags = d.flags.high + d.flags.medium + d.flags.low;
   const currentIdx = d.stages.reduce((n, s, i) => (s.at ? i : n), -1);
   const next: Record<string, [string, string]> = {
-    invited: ['Waiting for the client to start', ''], started: ['Client is working through discovery', ''],
-    submitted: ['Review flags, then approve the source', 'flags'], source: ['Develop positioning options', 'strategy'],
-    direction: ['Draft the framework', 'strategy'], draft: ['Review and refine the draft', 'strategy'],
+    invited: ['Wait for the client to start.', ''], started: ['The client is in discovery. Let them work.', ''],
+    submitted: ['Review the flags. Then approve the source.', 'flags'], source: ['Build the positioning options.', 'strategy'],
+    direction: ['Draft the framework.', 'strategy'], draft: ['Refine the draft.', 'strategy'],
   };
-  const step = currentIdx >= 0 ? next[d.stages[currentIdx].key] : ['Invite the client below', ''];
+  const step = currentIdx >= 0 ? next[d.stages[currentIdx].key] : ['Invite the client below.', ''];
   return (
     <>
       <div className="tiles">
@@ -391,8 +375,7 @@ function DataUseEditor() {
   if (!v) return <p className="page muted">Loading...</p>;
   return (
     <main className="page" id="main">
-      <p className="eyebrow"><Link to="/admin" style={{ color: 'inherit' }}>All projects</Link></p>
-      <h1>Data-use page</h1>
+      <h1 className="admin-title">Data-use page</h1>
       <p className="muted">Clients see this before starting. AI features stay off for client content until this page is marked as reviewed. Don't state legal terms, retention periods, certifications, or data residency you haven't verified.</p>
       <form onSubmit={async (e) => {
         e.preventDefault(); setMsg('');

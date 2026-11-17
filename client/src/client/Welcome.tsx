@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { WELCOME, ACK } from '@shared/content';
 import { api } from '../api';
 import { useDiscovery } from './ProjectRoutes';
+import { Hero } from './Hero';
 
 export function Welcome() {
   const { d, reload } = useDiscovery();
@@ -11,16 +12,16 @@ export function Welcome() {
   const [err, setErr] = useState('');
 
   return (
+    <>
+    <Hero eyebrow="Positioning studio · Discovery" line1="Tell us what you know." line2="We'll find the true story your customers connect with." steps={WELCOME.whatHappensNext}>
+      <p>{WELCOME.body[0]}</p>
+    </Hero>
     <main className="page" id="main">
-      <p className="eyebrow">Discovery</p>
-      <h1 className="display">{WELCOME.heading}</h1>
-      {WELCOME.body.map((p, i) => <p key={i} className={i === 0 ? 'lede' : undefined}>{p}</p>)}
+      <h2 className="intro-h">{WELCOME.heading}</h2>
+      {WELCOME.body.slice(1).map((p, i) => <p key={i}>{p}</p>)}
 
       <h2>Before you begin</h2>
       <ul className="squares">{WELCOME.beforeYouBegin.map((t) => <li key={t}>{t}</li>)}</ul>
-
-      <h2>What happens next</h2>
-      <ol className="rows">{WELCOME.whatHappensNext.map((t) => <li key={t}>{t}</li>)}</ol>
 
       <p className="small"><Link to="/data-use">How we use your information</Link> &middot; <Link to="/contact">Contact Rishari</Link></p>
 
@@ -39,5 +40,6 @@ export function Welcome() {
         <button type="submit" disabled={!checked || busy}>{WELCOME.button}</button>
       </form>
     </main>
+    </>
   );
 }

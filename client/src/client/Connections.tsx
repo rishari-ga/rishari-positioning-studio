@@ -6,22 +6,23 @@ import type { Summary } from '../api';
 import { useDiscovery } from './ProjectRoutes';
 import { ChapterMap, SaveIndicator } from './ModulePage';
 import type { SaveStatus } from './useAutosave';
+import { Hero } from './Hero';
 
 // Section 9: one summary for the customer company and one per priority persona, so the client can see how everything connects.
 export function ConnectionsPage() {
   const { d } = useDiscovery();
   const [summaries, setSummaries] = useState<Summary[] | null>(null);
   const [err, setErr] = useState('');
-  const h1 = useRef<HTMLHeadingElement>(null);
   const load = () => api<Summary[]>(`/api/projects/${d.project.id}/connections`).then(setSummaries).catch((x) => setErr((x as Error).message));
-  useEffect(() => { load(); h1.current?.focus(); }, [d.project.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); document.getElementById('hero-h')?.focus(); }, [d.project.id]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
+    <>
+    <Hero eyebrow="Check the connection" line1="Every answer connects." line2="Check the chain.">
+      <p>Each summary links a goal and a problem to what you offer and the result you expect. Dashed boxes are gaps. Fill them in, leave them open, or mark them to talk through with Rishari.</p>
+    </Hero>
     <div className="layout">
       <aside><ChapterMap current="connections" /></aside>
       <main id="main">
-        <p className="eyebrow">Before you submit</p>
-        <h1 ref={h1} tabIndex={-1}>Check the connection</h1>
-        <p className="lede">Here is how your answers fit together. Each summary links a goal and a problem to what you offer, the plan, and the result. Correct anything that is off, or mark it to talk through with Rishari.</p>
         {err && <p className="notice" role="alert">{err}</p>}
         {!summaries && !err && <p className="muted">Loading...</p>}
         {summaries?.map((s) => <SummaryCard key={s.personaId ?? 'company'} s={s} projectId={d.project.id} editable onSaved={load} />)}
@@ -31,6 +32,7 @@ export function ConnectionsPage() {
         </div>
       </main>
     </div>
+    </>
   );
 }
 

@@ -9,6 +9,7 @@ import { useDiscovery } from './ProjectRoutes';
 import { useAutosave } from './useAutosave';
 import type { Draft, SaveStatus } from './useAutosave';
 import { FollowupBox } from './Followups';
+import wordmarkWhite from '../assets/wordmark-white@2x.png';
 
 export type Step =
   | { kind: 'fields'; questions: Question[] }
@@ -77,7 +78,8 @@ export function ChapterMap({ current }: { current?: string }) {
           <li key={m.key}>
             <Link to={`/p/${d.project.id}/m/${m.key}/0`} aria-current={current === m.key ? 'page' : undefined}>
               <span className={`dot ${states[i] === 'none' ? '' : states[i]}`} aria-hidden="true" />
-              <span>{m.title}<span className="sr-only">{states[i] === 'done' ? ' (complete)' : states[i] === 'partial' ? ' (in progress)' : ''}</span></span>
+              <span className="cm-title">{m.title}<span className="sr-only">{states[i] === 'done' ? ' (complete)' : states[i] === 'partial' ? ' (in progress)' : ''}</span></span>
+              <span className="cm-num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
             </Link>
           </li>
         ))}
@@ -288,11 +290,13 @@ function ProgressStrip({ current, chapter, title }: { current: string; chapter: 
       <div className="progress-bar" role="progressbar" aria-label="Discovery progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.pct}><span style={{ width: `${p.pct}%` }} /></div>
       {open && (
         <div className="drawer-wrap" onClick={(e) => { if (e.target === e.currentTarget) { setOpen(false); btn.current?.focus(); } }}>
-          <div className="drawer" id="chapter-drawer" role="dialog" aria-modal="true" aria-label="All chapters" ref={panel}>
+          <div className="drawer dark" id="chapter-drawer" role="dialog" aria-modal="true" aria-label="All chapters" ref={panel}>
             <div className="drawer-head">
-              <p className="eyebrow" style={{ margin: 0 }}>{p.pct}% complete</p>
-              <button type="button" className="quiet" onClick={() => { setOpen(false); btn.current?.focus(); }}>Close</button>
+              <img src={wordmarkWhite} alt="Rishari" width={120} height={21} />
+              <button type="button" className="drawer-close" onClick={() => { setOpen(false); btn.current?.focus(); }}>Close</button>
             </div>
+            <p className="drawer-progress"><span>{p.pct}% complete</span><span>{p.label}</span></p>
+            <div className="progress-bar on-dark" aria-hidden="true"><span style={{ width: `${p.pct}%` }} /></div>
             <ChapterMap current={current} />
           </div>
         </div>

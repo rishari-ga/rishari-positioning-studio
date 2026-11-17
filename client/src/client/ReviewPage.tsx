@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CONFIRMATION } from '@shared/content';
 import { api } from '../api';
@@ -7,6 +7,7 @@ import type { Answer, Question, Discovery, Module, FocusOffer } from '../api';
 import { renderPrompt, EVIDENCE_OPTIONS, PURCHASE_ROLES, FIT_OPTIONS } from '@shared/narrative';
 import { priorityPersonas } from '../api';
 import { ChapterSummary } from './Followups';
+import { Hero } from './Hero';
 import type { Persona } from '../api';
 import { useDiscovery } from './ProjectRoutes';
 import { ChapterMap, SaveIndicator, stepIndexFor, ClarificationBanner } from './ModulePage';
@@ -30,16 +31,16 @@ export function ReviewPage() {
   const [err, setErr] = useState('');
   // One key per visit to this page, so a retried submit cannot create a duplicate snapshot.
   const idemKey = useMemo(() => crypto.randomUUID(), []);
-  const h1 = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { h1.current?.focus(); }, []);
+  useEffect(() => { document.getElementById('hero-h')?.focus(); }, []);
 
   return (
+    <>
+    <Hero eyebrow="Check and submit" line1={CONFIRMATION.heading} line2="Then send it to Rishari.">
+      <p>Here's everything you shared, in your own words. Fix anything that's off. Mark any chapter you'd like to talk through.</p>
+    </Hero>
     <div className="layout">
       <aside><ChapterMap current="review" /></aside>
       <main id="main">
-        <p className="eyebrow">Before you submit</p>
-        <h1 ref={h1} tabIndex={-1}>{CONFIRMATION.heading}</h1>
-        <p className="lede">Here's everything you shared, in your own words. Correct anything that's off, and mark any chapter you'd like to talk through.</p>
         <ClarificationBanner />
         {d.submissions.length > 0 && <p className="ok">You submitted version {d.submissions[0].version} on {new Date(d.submissions[0].created_at).toLocaleDateString()}. Submitting again creates a new version. The earlier one is kept.</p>}
 
@@ -73,6 +74,7 @@ export function ReviewPage() {
         </form>
       </main>
     </div>
+    </>
   );
 }
 
@@ -103,10 +105,10 @@ function ModuleControls({ moduleKey, marked, correction, onChange }: { moduleKey
 
 export function DonePage() {
   return (
-    <main className="page" id="main">
-      <p className="eyebrow">Discovery complete</p>
-      <h1 className="display">{CONFIRMATION.completion[0]}</h1>
-      <p className="lede">{CONFIRMATION.completion[1]}</p>
+    <main id="main" className="done">
+      <Hero eyebrow="Discovery complete" line1={CONFIRMATION.completion[0].split('. ')[0] + '.'} line2={CONFIRMATION.completion[0].split('. ').slice(1).join('. ')}>
+        <p>{CONFIRMATION.completion[1]}</p>
+      </Hero>
     </main>
   );
 }

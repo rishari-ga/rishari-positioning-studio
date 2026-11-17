@@ -1,0 +1,292 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom';
+import { api } from '../api';
+import type { Discovery, Offer } from '../api';
+import { formatValue } from '../client/ReviewPage';
+
+export function AdminRoutes() {
+  return (
+    <Routes>
+      <Route index element={<ProjectList />} />
+      <Route path="data-use" element={<DataUseEditor />} />
+      <Route path="p/:pid/*" element={<ProjectAdmin />} />
+    </Routes>
+  );
+}
+
+type Row = { id: string; name: string; company_name: string | null; status: string; is_fictional: boolean; client_email: string | null; answer_count: number; submitted_version: number | null; created_at: string };
+
+function ProjectList() {
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [form, setForm] = useState({ name: '', companyName: '', isFictional: false });
+  const [err, setErr] = useState('');
+  const load = useCallback(() => api<Row[]>('/api/admin/projects').then(setRows), []);
+  useEffect(() => { load(); }, [load]);
+  return (
+    <main className="page wide" id="main">
+      <h1>Projects</h1>
+      <p className="small"><Link to="/admin/data-use">Edit the data-use page</Link></p>
+      {!rows ? <p className="muted">Loading...</p> : rows.length === 0 ? <p className="muted">No projects yet.</p> : (
+        <table>
+          <thead><tr><th>Project</th><th>Client</th><th>Status</th><th>Answers</th><th>Submitted</th></tr></thead>
+          <tbody>{rows.map((r) => (
+            <tr key={r.id}>
+              <td><Link to={`/admin/p/${r.id}`}>{r.company_name || r.name}</Link> {r.is_fictional && <span className="fictional">Fictional</span>}</td>
+              <td>{r.client_email ?? <span className="muted">Not invited</span>}</td>
+              <td>{r.status}</td><td>{r.answer_count}</td><td>{r.submitted_version ? `v${r.submitted_version}` : '-'}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+      <h2 style={{ marginTop: '2.5rem' }}>New project</h2>
+      <form className="card" onSubmit={async (e) => {
+        e.preventDefault(); setErr('');
+        try { await api('/api/admin/projects', { method: 'POST', json: { name: form.name, companyName: form.companyName || undefined, isFictional: form.isFictional } }); setForm({ name: '', companyName: '', isFictional: false }); load(); }
+        catch (x) { setErr((x as Error).message); }
+      }}>
+        <div className="field"><label htmlFor="np-name">Project name</label><input id="np-name" type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+        <div className="field"><label htmlFor="np-co">Client company (optional)</label><input id="np-co" type="text" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} /></div>
+        <label className="choice"><input type="checkbox" checked={form.isFictional} onChange={(e) => setForm({ ...form, isFictional: e.target.checked })} /><span>This is a fictional test project</span></label>
+        {err && <p className="notice" role="alert">{err}</p>}
+        <p><button type="submit">Create project</button></p>
+      </form>
+    </main>
+  );
+}
+
+type Overview = {
+  project: { id: string; name: string; company_name: string | null; status: string; is_fictional: boolean };
+  client: { email: string; display_name: string | null } | null;
+  invitation: { email: string; expires_at: string; accepted_at: string | null } | null;
+  acknowledgment: { ack_version: string; created_at: string } | null;
+  snapshots: { id: string; version: number; kind: string; created_at: string }[];
+};
+
+function ProjectAdmin() {
+  const { pid } = useParams();
+  const [o, setO] = useState<Overview | null>(null);
+  const load = useCallback(() => api<Overview>(`/api/admin/projects/${pid}`).then(setO), [pid]);
+  useEffect(() => { load(); }, [load]);
+  if (!o) return <p className="page muted">Loading...</p>;
+  const base = `/admin/p/${pid}`;
+  return (
+    <main className="page wide" id="main">
+      <p className="small"><Link to="/admin">All projects</Link></p>
+      <h1>{o.project.company_name || o.project.name} {o.project.is_fictional && <span className="fictional">Fictional</span>}</h1>
+      <nav className="tabs" aria-label="Project views">
+        <NavLink end to={base}>Overview</NavLink>
+        <NavLink to={`${base}/answers`}>Answers</NavLink>
+        <NavLink to={`${base}/offers`}>Offers and scope</NavLink>
+        <NavLink to={`${base}/notes`}>Notes</NavLink>
+        <NavLink to={`${base}/activity`}>Activity</NavLink>
+      </nav>
+      <Routes>
+        <Route index element={<OverviewTab o={o} reload={load} />} />
+        <Route path="answers" element={<AnswersTab />} />
+        <Route path="offers" element={<OffersTab />} />
+        <Route path="notes" element={<NotesTab />} />
+        <Route path="activity" element={<ActivityTab />} />
+      </Routes>
+    </main>
+  );
+}
+
+function OverviewTab({ o, reload }: { o: Overview; reload: () => void }) {
+  const [email, setEmail] = useState('');
+  const [link, setLink] = useState('');
+  const [err, setErr] = useState('');
+  return (
+    <>
+      <section className="card">
+        <h2>Client</h2>
+        {o.client ? <p>{o.client.display_name ? `${o.client.display_name}, ` : ''}{o.client.email}</p> : (
+          <>
+            {o.invitation && !o.invitation.accepted_at && <p className="small muted">Invitation pending for {o.invitation.email}, expires {new Date(o.invitation.expires_at).toLocaleDateString()}. Creating a new link replaces it.</p>}
+            <form onSubmit={async (e) => {
+              e.preventDefault(); setErr(''); setLink('');
+              try { const r = await api<{ link: string }>(`/api/admin/projects/${o.project.id}/invitations`, { method: 'POST', json: { email } }); setLink(r.link); reload(); }
+              catch (x) { setErr((x as Error).message); }
+            }}>
+              <div className="field"><label htmlFor="inv-email">Client email</label><input id="inv-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <button type="submit">Create invitation link</button>
+            </form>
+            {err && <p className="notice" role="alert">{err}</p>}
+            {link && (
+              <div className="ok" style={{ marginTop: '1rem' }}>
+                <p><strong>Invitation link created.</strong> Nothing has been sent. Copy this link and share it with the client yourself. It works once, for {email}, for 14 days.</p>
+                <input type="text" readOnly value={link} aria-label="Invitation link" onFocus={(e) => e.target.select()} />
+              </div>
+            )}
+          </>
+        )}
+      </section>
+      <section className="card">
+        <h2>Progress</h2>
+        <p>Status: {o.project.status}</p>
+        <p>Process acknowledgment: {o.acknowledgment ? `${o.acknowledgment.ack_version}, ${new Date(o.acknowledgment.created_at).toLocaleString()}` : 'Not yet'}</p>
+        <p>Submitted versions: {o.snapshots.length ? o.snapshots.map((s) => `v${s.version} (${new Date(s.created_at).toLocaleDateString()})`).join(', ') : 'None yet'}</p>
+      </section>
+    </>
+  );
+}
+
+function AnswersTab() {
+  const { pid } = useParams();
+  const [d, setD] = useState<Discovery | null>(null);
+  useEffect(() => { api<Discovery>(`/api/admin/projects/${pid}/answers`).then(setD); }, [pid]);
+  if (!d) return <p className="muted">Loading...</p>;
+  const statusLabel = (s: string) => (s === 'not_sure' ? 'Not sure yet' : s === 'discuss' ? 'Discuss with Rishari' : null);
+  return (
+    <>
+      <p className="muted small">Live answers in the client's own words. Submitted versions are frozen separately.</p>
+      {d.modules.map((m) => {
+        const prog = d.progress.find((p) => p.module_id === m.id);
+        const files = d.attachments.filter((a) => a.module_id === m.id);
+        return (
+          <section key={m.id} className="card">
+            <h2>{m.title} {prog?.marked_for_discussion && <span className="tag warn">Marked for discussion</span>}</h2>
+            {m.questions.map((q) => {
+              if (q.kind === 'offer_list') return <p key={q.id} className="small muted">Offers: see the Offers and scope tab ({d.offers.length}).</p>;
+              const a = d.answers.find((x) => x.question_id === q.id);
+              const text = formatValue(q, a);
+              return (
+                <div className="answer-block" key={q.id}>
+                  <p className="q">{q.prompt}{a && statusLabel(a.status) && <span className="tag warn">{statusLabel(a.status)}</span>}</p>
+                  {text ? <p className="a">{text}</p> : <p className="muted small">No answer.</p>}
+                </div>
+              );
+            })}
+            {prog?.client_correction && <p><strong>Client correction:</strong> {prog.client_correction}</p>}
+            {files.length > 0 && <p className="small">Attachments: {files.map((f) => <AttachmentLink key={f.id} pid={pid!} id={f.id} name={f.original_name} />)}</p>}
+            <NoteForm topicType="module" topicId={m.id} />
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
+function AttachmentLink({ pid, id, name }: { pid: string; id: string; name: string }) {
+  return <button className="link" style={{ marginRight: '0.75rem' }} onClick={async () => {
+    const r = await api<{ url: string }>(`/api/projects/${pid}/attachments/${id}/link`);
+    window.location.href = r.url;
+  }}>{name}</button>;
+}
+
+function OffersTab() {
+  const { pid } = useParams();
+  const [offers, setOffers] = useState<Offer[] | null>(null);
+  const load = useCallback(() => api<Offer[]>(`/api/admin/projects/${pid}/offers`).then(setOffers), [pid]);
+  useEffect(() => { load(); }, [load]);
+  if (!offers) return <p className="muted">Loading...</p>;
+  return (
+    <>
+      <p className="muted small">The client lists every offer. Only you decide which ones are in scope for strategy work. Adding offers never expands scope on its own.</p>
+      {offers.length === 0 ? <p className="muted">No offers yet.</p> : (
+        <table>
+          <thead><tr><th>Offer</th><th>Status</th><th>Priority</th><th>In scope</th></tr></thead>
+          <tbody>{offers.map((o) => (
+            <tr key={o.id}>
+              <td><strong>{o.name}</strong>{o.description && <><br /><span className="small">{o.description}</span></>}</td>
+              <td>{o.availability ?? '-'}</td><td>{o.priority ?? '-'}</td>
+              <td><label className="choice"><input type="checkbox" checked={!!o.in_scope} onChange={async (e) => { await api(`/api/admin/projects/${pid}/offers/${o.id}/scope`, { method: 'PUT', json: { inScope: e.target.checked } }); load(); }} /><span className="sr-only">In scope: {o.name}</span></label></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+    </>
+  );
+}
+
+type Note = { id: string; topic_type: string; topic_id: string | null; note_type: string; body: string; author_email: string; author_name: string | null; created_at: string };
+
+function NoteForm({ topicType, topicId, onAdded }: { topicType: string; topicId?: string; onAdded?: () => void }) {
+  const { pid } = useParams();
+  const [body, setBody] = useState('');
+  const [noteType, setNoteType] = useState('interpretation');
+  const [msg, setMsg] = useState('');
+  const fid = `note-${topicId ?? 'project'}`;
+  return (
+    <details style={{ marginTop: '0.75rem' }}>
+      <summary className="small">Add a review note</summary>
+      <form onSubmit={async (e) => {
+        e.preventDefault(); setMsg('');
+        try { await api(`/api/admin/projects/${pid}/notes`, { method: 'POST', json: { topicType, topicId: topicId ?? null, noteType, body } }); setBody(''); setMsg('Note saved.'); onAdded?.(); }
+        catch (x) { setMsg((x as Error).message); }
+      }}>
+        <div className="field"><label htmlFor={`${fid}-type`}>Type</label>
+          <select id={`${fid}-type`} value={noteType} onChange={(e) => setNoteType(e.target.value)}>
+            <option value="confirmed">Confirmed information</option><option value="interpretation">Interpretation</option><option value="assumption">Assumption</option>
+          </select></div>
+        <div className="field"><label htmlFor={fid}>Note</label><textarea id={fid} rows={3} required value={body} onChange={(e) => setBody(e.target.value)} /></div>
+        <button type="submit">Save note</button> <span className="small muted" role="status">{msg}</span>
+      </form>
+    </details>
+  );
+}
+
+function NotesTab() {
+  const { pid } = useParams();
+  const [notes, setNotes] = useState<Note[] | null>(null);
+  const [mods, setMods] = useState<Discovery['modules']>([]);
+  const load = useCallback(() => api<Note[]>(`/api/admin/projects/${pid}/notes`).then(setNotes), [pid]);
+  useEffect(() => { load(); api<Discovery>(`/api/admin/projects/${pid}/answers`).then((d) => setMods(d.modules)); }, [load, pid]);
+  if (!notes) return <p className="muted">Loading...</p>;
+  const topic = (n: Note) => n.topic_type === 'module' ? mods.find((m) => m.id === n.topic_id)?.title ?? 'Chapter' : n.topic_type === 'project' ? 'Whole project' : n.topic_type;
+  const typeLabel: Record<string, string> = { confirmed: 'Confirmed', interpretation: 'Interpretation', assumption: 'Assumption' };
+  return (
+    <>
+      <p className="muted small">Private to Rishari reviewers. Clients never see these notes.</p>
+      <NoteForm topicType="project" onAdded={load} />
+      {notes.length === 0 ? <p className="muted" style={{ marginTop: '1.5rem' }}>No notes yet.</p> : notes.map((n) => (
+        <div className="card" key={n.id} style={{ marginTop: '1rem' }}>
+          <p className="small muted">{topic(n)} <span className="tag">{typeLabel[n.note_type]}</span> &middot; {n.author_name ?? n.author_email}, {new Date(n.created_at).toLocaleString()}</p>
+          <p style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{n.body}</p>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function ActivityTab() {
+  const { pid } = useParams();
+  const [rows, setRows] = useState<{ action: string; actor_email: string | null; created_at: string }[] | null>(null);
+  useEffect(() => { api<typeof rows>(`/api/admin/projects/${pid}/activity`).then(setRows); }, [pid]);
+  if (!rows) return <p className="muted">Loading...</p>;
+  return (
+    <table>
+      <thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead>
+      <tbody>{rows.map((r, i) => <tr key={i}><td>{new Date(r.created_at).toLocaleString()}</td><td>{r.actor_email ?? 'System'}</td><td>{r.action}</td></tr>)}</tbody>
+    </table>
+  );
+}
+
+function DataUseEditor() {
+  const [v, setV] = useState<{ reviewed: boolean; sections: { heading: string; body: string }[] } | null>(null);
+  const [msg, setMsg] = useState('');
+  useEffect(() => { api<{ value: NonNullable<typeof v> }>('/api/admin/data-use').then((r) => setV(r.value)); }, []);
+  if (!v) return <p className="page muted">Loading...</p>;
+  return (
+    <main className="page" id="main">
+      <p className="small"><Link to="/admin">All projects</Link></p>
+      <h1>Data-use page</h1>
+      <p className="muted">Clients see this before starting. AI features stay off for client content until this page is marked as reviewed. Don't state legal terms, retention periods, certifications, or data residency you haven't verified.</p>
+      <form onSubmit={async (e) => {
+        e.preventDefault(); setMsg('');
+        try { await api('/api/admin/data-use', { method: 'PUT', json: v }); setMsg('Saved.'); } catch (x) { setMsg((x as Error).message); }
+      }}>
+        {v.sections.map((s, i) => (
+          <div className="card" key={i}>
+            <div className="field"><label htmlFor={`du-h-${i}`}>Heading</label>
+              <input id={`du-h-${i}`} type="text" value={s.heading} onChange={(e) => setV({ ...v, sections: v.sections.map((x, j) => (j === i ? { ...x, heading: e.target.value } : x)) })} /></div>
+            <div className="field"><label htmlFor={`du-b-${i}`}>Text</label>
+              <textarea id={`du-b-${i}`} rows={5} value={s.body} onChange={(e) => setV({ ...v, sections: v.sections.map((x, j) => (j === i ? { ...x, body: e.target.value } : x)) })} /></div>
+          </div>
+        ))}
+        <label className="choice"><input type="checkbox" checked={v.reviewed} onChange={(e) => setV({ ...v, reviewed: e.target.checked })} /><span>I've reviewed this page and it is accurate.</span></label>
+        <p><button type="submit">Save</button> <span role="status" className="small">{msg}</span></p>
+        <p className="small"><Link to="/data-use">View the client version</Link></p>
+      </form>
+    </main>
+  );
+}

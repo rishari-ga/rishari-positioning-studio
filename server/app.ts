@@ -76,6 +76,12 @@ export function createApp() {
   // ---- Client project routes -----------------------------------------------
   const pr = express.Router({ mergeParams: true });
   app.use('/api/projects/:pid', pr);
+  // Note client activity for the "Active now" marker. Never blocks or fails the request.
+  pr.use((req, _res, next) => {
+    const pid = (req.params as { pid?: string }).pid;
+    if (req.user && !req.user.isAdmin && pid && /^[0-9a-f-]{36}$/i.test(pid)) void projects.touchActivity(req.user.id, pid).catch(() => {});
+    next();
+  });
 
   pr.get('/discovery', h(async (req, res) => {
     const user = requireUser(req);
@@ -221,6 +227,10 @@ export function createApp() {
   ad.use((req, _res, next) => { try { requireAdmin(requireUser(req)); next(); } catch (e) { next(e); } });
 
   ad.get('/projects', h(async (req, res) => { res.json(await projects.listProjectsForAdmin(req.user!)); }));
+  ad.delete('/projects/:pid', rateLimit(10, 60_000), h(async (req, res) => {
+    assertUuid(req.params.pid);
+    res.json(await projects.deleteProject(req.user!, req.params.pid, req.body?.confirmName));
+  }));
   ad.post('/projects', h(async (req, res) => {
     const body = z.object({ name: z.string().trim().min(1).max(200), companyName: z.string().trim().max(200).optional(), isFictional: z.boolean().optional() }).parse(req.body);
     res.json(await projects.createProject(req.user!, body));

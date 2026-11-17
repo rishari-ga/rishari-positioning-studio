@@ -4,6 +4,7 @@ import type { CurrentUser } from '../auth/identity.js';
 import { HttpError, notFound } from '../http.js';
 import { audit } from './audit.js';
 import { requireAdmin } from './permissions.js';
+import { storage } from '../storage/adapter.js';
 
 const hashToken = (t: string) => crypto.createHash('sha256').update(t).digest('hex');
 
@@ -25,7 +26,8 @@ export async function listProjectsForAdmin(admin: CurrentUser) {
   const r = await pool.query(`
     SELECT p.*, u.email AS client_email,
       (SELECT count(*) FROM answers a WHERE a.project_id=p.id AND a.status <> 'empty')::int AS answer_count,
-      (SELECT max(version) FROM source_snapshots s WHERE s.project_id=p.id AND s.kind='client_intake') AS submitted_version
+      (SELECT max(version) FROM source_snapshots s WHERE s.project_id=p.id AND s.kind='client_intake') AS submitted_version,
+      (SELECT max(last_active_at) FROM project_memberships mm WHERE mm.project_id=p.id) AS last_active_at
     FROM projects p
     LEFT JOIN project_memberships m ON m.project_id=p.id AND m.role='client_primary'
     LEFT JOIN users u ON u.id=m.user_id
@@ -93,4 +95,49 @@ export async function getProjectOverview(projectId: string) {
   const snapshots = (await pool.query(
     `SELECT id, version, kind, content_hash, created_at FROM source_snapshots WHERE project_id=$1 ORDER BY version DESC`, [projectId])).rows;
   return { project: p, client, invitation, scope, acknowledgment: ack, snapshots };
+}
+
+// Records that a client is working in a project. Throttled to one write a minute per person,
+// and only ever touches the caller's own membership row.
+export async function touchActivity(userId: string, projectId: string) {
+  await pool.query(
+    `UPDATE project_memberships SET last_active_at=now()
+     WHERE project_id=$1 AND user_id=$2 AND (last_active_at IS NULL OR last_active_at < now() - interval '1 minute')`,
+    [projectId, userId],
+  );
+}
+
+// Permanently deletes a project: answers, personas, uploads (including the files), notes, flags,
+// snapshots, approvals, and generated drafts. The caller must type the project's name to confirm.
+// Client sign-in records that belong to no other project are anonymized. Audit events keep only
+// the fact that a deletion happened.
+export async function deleteProject(admin: CurrentUser, projectId: string, confirmName: unknown) {
+  requireAdmin(admin);
+  const p = (await pool.query('SELECT id, name, company_name, is_fictional FROM projects WHERE id=$1', [projectId])).rows[0];
+  if (!p) throw new HttpError(404, 'not_found', 'Not found.');
+  const label = (p.company_name || p.name) as string;
+  if (typeof confirmName !== 'string' || confirmName.trim() !== label.trim()) {
+    throw new HttpError(400, 'confirm_mismatch', `Type the project name exactly to confirm: ${label}`);
+  }
+  const keys = (await pool.query('SELECT storage_key FROM attachments WHERE project_id=$1', [projectId])).rows.map((r) => r.storage_key as string);
+  const clients = (await pool.query(
+    `SELECT m.user_id FROM project_memberships m JOIN users u ON u.id=m.user_id
+     WHERE m.project_id=$1 AND NOT u.is_admin
+       AND NOT EXISTS (SELECT 1 FROM project_memberships o WHERE o.user_id=m.user_id AND o.project_id<>$1)`,
+    [projectId],
+  )).rows.map((r) => r.user_id as string);
+  await tx(async (c) => {
+    await c.query('DELETE FROM projects WHERE id=$1', [projectId]);
+    for (const id of clients) {
+      await c.query(
+        `UPDATE users SET email = 'deleted-' || id || '@deleted.invalid', display_name = NULL, auth_subject = NULL WHERE id=$1`,
+        [id],
+      );
+    }
+  });
+  // Files go after the records, so a storage hiccup can never leave records pointing at missing files.
+  let fileErrors = 0;
+  for (const k of keys) { try { await storage.remove(k); } catch { fileErrors++; } }
+  await audit({ actorId: admin.id, action: 'project.deleted', targetType: 'project', targetId: projectId, detail: { fictional: p.is_fictional, files: keys.length, fileErrors, anonymizedUsers: clients.length } });
+  return { deleted: true, files: keys.length, fileErrors, anonymizedUsers: clients.length };
 }

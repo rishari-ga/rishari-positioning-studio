@@ -204,3 +204,7 @@ dl.defs dd { margin: 0.15rem 0 0; }
 .summary-grid dd { margin: 0; }
 @media (max-width: 600px) { .summary-grid { grid-template-columns: 1fr; } .summary-grid dd { margin-bottom: 0.6rem; } }
 pre.brief { white-space: pre-wrap; font-family: inherit; font-size: 0.875rem; background: var(--grey); padding: 1rem; border-radius: var(--radius-sm); margin-top: 1rem; max-height: 32rem; overflow: auto; }
+.tag.active { background: #00ccff; color: #000; border-color: #00ccff; }
+.card.danger { border-color: #b3261e; }
+button.danger { background: #b3261e; border-color: #b3261e; color: #fff; }
+button.danger:disabled { opacity: 0.45; }

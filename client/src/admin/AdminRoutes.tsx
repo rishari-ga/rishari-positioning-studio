@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom';
+import { Link, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Discovery, Offer } from '../api';
 import { ModuleAnswers } from '../client/ReviewPage';
@@ -16,14 +16,25 @@ export function AdminRoutes() {
   );
 }
 
-type Row = { id: string; name: string; company_name: string | null; status: string; is_fictional: boolean; client_email: string | null; answer_count: number; submitted_version: number | null; created_at: string };
+type Row = { id: string; name: string; company_name: string | null; status: string; is_fictional: boolean; client_email: string | null; answer_count: number; submitted_version: number | null; created_at: string; last_active_at: string | null };
+
+// "Active now" means the client did something in the last 10 minutes.
+const ACTIVE_MS = 10 * 60 * 1000;
+export function LastActive({ at }: { at: string | null }) {
+  if (!at) return <span className="muted">Not yet</span>;
+  const ms = Date.now() - new Date(at).getTime();
+  if (ms < ACTIVE_MS) return <span className="tag active">Active now</span>;
+  const mins = Math.round(ms / 60000), hrs = Math.round(ms / 3600000), days = Math.round(ms / 86400000);
+  return <span title={new Date(at).toLocaleString()}>{mins < 60 ? `${mins} min ago` : hrs < 24 ? `${hrs} hr ago` : `${days} day${days === 1 ? '' : 's'} ago`}</span>;
+}
 
 function ProjectList() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [form, setForm] = useState({ name: '', companyName: '', isFictional: false });
   const [err, setErr] = useState('');
   const load = useCallback(() => api<Row[]>('/api/admin/projects').then(setRows), []);
-  useEffect(() => { load(); }, [load]);
+  // Refresh every minute so "Active now" stays accurate while this page is open.
+  useEffect(() => { load(); const t = setInterval(load, 60_000); return () => clearInterval(t); }, [load]);
   return (
     <main className="page wide" id="main">
       <p className="eyebrow">Rishari review</p>
@@ -31,11 +42,12 @@ function ProjectList() {
       <p className="small"><Link to="/admin/data-use">Edit the data-use page</Link> &middot; <Link to="/admin/guidance">Edit the guidance library</Link></p>
       {!rows ? <p className="muted">Loading...</p> : rows.length === 0 ? <p className="muted">No projects yet.</p> : (
         <table>
-          <thead><tr><th>Project</th><th>Client</th><th>Status</th><th>Answers</th><th>Submitted</th></tr></thead>
+          <thead><tr><th>Project</th><th>Client</th><th>Last active</th><th>Status</th><th>Answers</th><th>Submitted</th></tr></thead>
           <tbody>{rows.map((r) => (
             <tr key={r.id}>
               <td><Link to={`/admin/p/${r.id}`}>{r.company_name || r.name}</Link> {r.is_fictional && <span className="fictional">Fictional</span>}</td>
               <td>{r.client_email ?? <span className="muted">Not invited</span>}</td>
+              <td><LastActive at={r.last_active_at} /></td>
               <td>{r.status}</td><td>{r.answer_count}</td><td>{r.submitted_version ? `v${r.submitted_version}` : '-'}</td>
             </tr>
           ))}</tbody>
@@ -137,7 +149,39 @@ function OverviewTab({ o, reload }: { o: Overview; reload: () => void }) {
         <p>Process acknowledgment: {o.acknowledgment ? `${o.acknowledgment.ack_version}, ${new Date(o.acknowledgment.created_at).toLocaleString()}` : 'Not yet'}</p>
         <p>Submitted versions: {o.snapshots.length ? o.snapshots.map((s) => `v${s.version} (${new Date(s.created_at).toLocaleDateString()})`).join(', ') : 'None yet'}</p>
       </section>
+      <DeleteProject o={o} />
     </>
+  );
+}
+
+// Permanent deletion, for client requests and the retention schedule. Typing the name guards against mistakes.
+function DeleteProject({ o }: { o: Overview }) {
+  const label = o.project.company_name || o.project.name;
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const nav = useNavigate();
+  return (
+    <section className="card danger" aria-labelledby="del-h">
+      <h2 id="del-h">Delete this project</h2>
+      <p className="small">Permanently deletes every answer, persona, upload (including the files), note, flag, submitted version, approval, and draft for this project. The client's sign-in record is anonymized if they have no other project. This can't be undone. Backup copies at Render age out within about 7 days.</p>
+      {!open ? <button className="secondary" onClick={() => setOpen(true)}>Delete project...</button> : (
+        <form onSubmit={async (e) => {
+          e.preventDefault(); setBusy(true); setErr('');
+          try { await api(`/api/admin/projects/${o.project.id}`, { method: 'DELETE', json: { confirmName: typed } }); nav('/admin'); }
+          catch (x) { setErr((x as Error).message); setBusy(false); }
+        }}>
+          <div className="field">
+            <label htmlFor="del-name">Type <strong>{label}</strong> to confirm</label>
+            <input id="del-name" type="text" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
+          </div>
+          {err && <p className="notice" role="alert">{err}</p>}
+          <button type="submit" className="danger" disabled={busy || typed.trim() !== label.trim()}>{busy ? 'Deleting...' : 'Permanently delete'}</button>{' '}
+          <button type="button" className="secondary" onClick={() => { setOpen(false); setTyped(''); }}>Cancel</button>
+        </form>
+      )}
+    </section>
   );
 }
 

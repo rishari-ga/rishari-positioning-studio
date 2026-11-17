@@ -75,7 +75,7 @@ export function ReviewPage() {
             await reload(); nav(`/p/${d.project.id}/done`);
           } catch (x) { setErr((x as Error).message); setBusy(false); }
         }}>
-          <div className="card" style={{ background: 'var(--grey)', border: 0 }}>
+          <div className="card" style={{ background: 'var(--grey)', border: 0, borderRadius: 'var(--radius-md)' }}>
             <label className="choice" htmlFor="confirm">
               <input id="confirm" type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
               <span>{CONFIRMATION.checkbox}</span>

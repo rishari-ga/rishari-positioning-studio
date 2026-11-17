@@ -30,7 +30,7 @@ Development sign-in (`AUTH_MODE=dev`) has no passwords and is blocked from start
 
 ## Brand
 
-Styling follows the Rishari Brand Guidelines v1.0 (July 2026): Inter only, black and white with cool grey bands, dark cyan (#0077A3) for eyebrows and links, square corners, and the wordmark's cyan square as the only bright cyan. Tokens live at the top of `client/src/styles.css`.
+Styling follows the Rishari Brand Guidelines v1.0 (July 2026): Inter only, black and white with cool grey bands, dark cyan (#0077A3) for eyebrows and links, slightly rounded corners (4px controls, 8px panels), and cyan only for the wordmark square and numbered-row circles. Tokens live at the top of `client/src/styles.css`.
 
 ## Tests
 

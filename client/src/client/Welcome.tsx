@@ -29,7 +29,7 @@ export function Welcome() {
         try { await api(`/api/projects/${d.project.id}/acknowledgment`, { method: 'POST', json: { version: ACK.version } }); await reload(); }
         catch (x) { setErr((x as Error).message); setBusy(false); }
       }}>
-        <div className="field" style={{ background: 'var(--grey)', padding: '1.25rem', marginTop: '2rem' }}>
+        <div className="field" style={{ background: 'var(--grey)', padding: '1.25rem', marginTop: '2rem', borderRadius: 'var(--radius-md)' }}>
           <label className="choice" htmlFor="ack">
             <input id="ack" type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
             <span>{ACK.text}</span>

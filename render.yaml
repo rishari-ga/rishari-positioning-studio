@@ -36,8 +36,17 @@ services:
         value: /var/data/uploads
       - key: STORAGE_PERSISTENT_DISK
         value: "true"
+      # AI runs only when OPENAI_API_KEY is also set (add it in the Render dashboard; never in this file).
       - key: AI_ENABLED
-        value: "false"
+        value: "true"
+      - key: INTAKE_MODEL
+        value: gpt-5.4-mini
+      - key: STRATEGY_MODEL
+        value: gpt-5.4
+      - key: AI_PROJECT_MONTHLY_CAP_USD
+        value: "15"
+      - key: AI_TOTAL_MONTHLY_CAP_USD
+        value: "150"
 
 databases:
   - name: rishari-db

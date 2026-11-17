@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { SignIn, UserButton, useAuth } from '@clerk/clerk-react';
+import { SignIn, UserButton, useAuth } from '@clerk/react';
 import { SessionProvider, useSession } from './session';
 import { api } from './api';
 import wordmark from './assets/wordmark-black@2x.png';

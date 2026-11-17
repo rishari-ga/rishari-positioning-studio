@@ -219,7 +219,10 @@ describe('data-use page', () => {
   it('cannot be marked reviewed while placeholders remain, and only admins can edit it', async () => {
     const admin = await as(ADMIN);
     const cur = (await admin.get('/api/admin/data-use').expect(200)).body.value;
-    await admin.put('/api/admin/data-use').send({ ...cur, reviewed: true }).expect(400);
+    const withPlaceholder = { ...cur, sections: [...cur.sections, { heading: 'Contact', body: 'To be completed by Rishari: the email address.' }] };
+    await admin.put('/api/admin/data-use').send({ ...withPlaceholder, reviewed: true }).expect(400);
+    await admin.put('/api/admin/data-use').send({ ...cur, reviewed: true }).expect(200); // the finished default has no placeholders
+    await admin.put('/api/admin/data-use').send({ ...cur, reviewed: false }).expect(200);
     const a = await as(CLIENT_A);
     await a.put('/api/admin/data-use').send({ ...cur, reviewed: false }).expect(403);
   });

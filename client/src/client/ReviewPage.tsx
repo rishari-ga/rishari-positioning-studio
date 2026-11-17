@@ -31,6 +31,7 @@ export function ReviewPage() {
     <div className="layout">
       <aside><ChapterMap current="review" /></aside>
       <main id="main">
+        <p className="eyebrow">Before you submit</p>
         <h1 ref={h1} tabIndex={-1}>{CONFIRMATION.heading}</h1>
         <p className="lede">Here's everything you shared, in your own words. Correct anything that's off, and mark any chapter you'd like to talk through.</p>
         {d.submissions.length > 0 && <p className="ok">You submitted version {d.submissions[0].version} on {new Date(d.submissions[0].created_at).toLocaleDateString()}. Submitting again creates a new version. The earlier one is kept.</p>}
@@ -74,7 +75,7 @@ export function ReviewPage() {
             await reload(); nav(`/p/${d.project.id}/done`);
           } catch (x) { setErr((x as Error).message); setBusy(false); }
         }}>
-          <div className="card">
+          <div className="card" style={{ background: 'var(--grey)', border: 0 }}>
             <label className="choice" htmlFor="confirm">
               <input id="confirm" type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
               <span>{CONFIRMATION.checkbox}</span>
@@ -116,7 +117,8 @@ function ModuleControls({ moduleKey, marked, correction, onChange }: { moduleKey
 export function DonePage() {
   return (
     <main className="page" id="main">
-      <h1>{CONFIRMATION.completion[0]}</h1>
+      <p className="eyebrow">Discovery complete</p>
+      <h1 className="display">{CONFIRMATION.completion[0]}</h1>
       <p className="lede">{CONFIRMATION.completion[1]}</p>
     </main>
   );

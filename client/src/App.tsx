@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { SignIn, UserButton, useAuth } from '@clerk/clerk-react';
 import { SessionProvider, useSession } from './session';
 import { api } from './api';
+import wordmark from './assets/wordmark-black@2x.png';
+import { DemoBar } from './demo/DemoBar';
 import { ProjectRoutes } from './client/ProjectRoutes';
 import { AdminRoutes } from './admin/AdminRoutes';
 
@@ -17,6 +19,7 @@ export function App({ authMode }: { authMode: 'clerk' | 'dev' }) {
   const routes = (
     <>
       <a className="skip-link" href="#main">Skip to content</a>
+      {import.meta.env.VITE_DEMO === 'true' && <DemoBar />}
       <TopBar />
       <Routes>
         <Route path="/" element={<Home />} />
@@ -38,11 +41,11 @@ function TopBar() {
   const nav = useNavigate();
   return (
     <header className="topbar">
-      <Link to="/" className="wordmark">Rishari</Link>
+      <Link to="/" className="wordmark"><img src={wordmark} alt="Rishari" width={129} height={22} /></Link>
       <nav aria-label="Account">
         {user?.isAdmin && <Link to="/admin">Projects</Link>}
         {user && authMode === 'clerk' && <UserButton />}
-        {user && authMode === 'dev' && (
+        {user && authMode === 'dev' && import.meta.env.VITE_DEMO !== 'true' && (
           <>
             <span className="small muted">{user.email} (dev sign-in)</span>
             <button className="quiet" onClick={async () => { await api('/api/dev/logout', { method: 'POST' }); await refresh(); nav('/'); }}>Sign out</button>
@@ -55,8 +58,9 @@ function TopBar() {
 
 function RequireUser({ admin, children }: { admin?: boolean; children: ReactNode }) {
   const { loading, user } = useSession();
+  const loc = useLocation();
   if (loading) return <p className="page muted">Loading...</p>;
-  if (!user) return <Navigate to={`/sign-in?next=${encodeURIComponent(location.pathname)}`} replace />;
+  if (!user) return <Navigate to={`/sign-in?next=${encodeURIComponent(loc.pathname)}`} replace />;
   if (admin && !user.isAdmin) return <div className="page" id="main"><h1>Not available</h1><p>This area is for Rishari reviewers.</p></div>;
   return <>{children}</>;
 }
@@ -87,7 +91,8 @@ function Home() {
 
 function SignInPage() {
   const { authMode, user, refresh } = useSession();
-  const next = new URLSearchParams(location.search).get('next') || '/';
+  const loc = useLocation();
+  const next = new URLSearchParams(loc.search).get('next') || '/';
   const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
   const [email, setEmail] = useState('');
   const [err, setErr] = useState('');

@@ -214,6 +214,7 @@ const emptyOffer = { name: '', description: '', intended_customer: '', availabil
 function OffersEditor({ q }: { q: Question }) {
   const { d, reload } = useDiscovery();
   const [editing, setEditing] = useState<Offer | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
   return (
     <div className="field">
       <h2 className="question-prompt">{q.prompt}</h2>
@@ -225,7 +226,9 @@ function OffersEditor({ q }: { q: Question }) {
           {o.description && <p>{o.description}</p>}
           <p className="small muted">{[o.availability && { available: 'Available now', pilot: 'Pilot', planned: 'Planned' }[o.availability], o.priority && `Priority ${o.priority}`].filter(Boolean).join(' · ')}</p>
           <button className="quiet" onClick={() => setEditing(o)}>Edit</button>{' '}
-          <button className="quiet" onClick={async () => { if (confirm(`Remove "${o.name}"?`)) { await api(`/api/projects/${d.project.id}/offers/${o.id}`, { method: 'DELETE' }); await reload(); } }}>Remove</button>
+          {removing === o.id
+            ? <><button className="quiet" onClick={async () => { await api(`/api/projects/${d.project.id}/offers/${o.id}`, { method: 'DELETE' }); setRemoving(null); await reload(); }}>Yes, remove it</button>{' '}<button className="quiet" onClick={() => setRemoving(null)}>Keep it</button></>
+            : <button className="quiet" onClick={() => setRemoving(o.id)}>Remove</button>}
         </div>
       ))}
       {editing ? <OfferForm offer={editing} onDone={async () => { setEditing(null); await reload(); }} /> : <button className="secondary" onClick={() => setEditing(emptyOffer)}>Add an offer</button>}

@@ -6,7 +6,7 @@ Guided discovery and review workspace for Rishari's B2B positioning work. `SPEC.
 
 ## Stack
 
-React + TypeScript (Vite) · Node.js + Express + TypeScript · PostgreSQL · Clerk sign-in · S3-compatible file storage · Render hosting. OpenAI API arrives in Pass 2.
+React + TypeScript (Vite, Inter via @fontsource) · Node.js + Express + TypeScript · PostgreSQL · Clerk sign-in · S3-compatible file storage · Render hosting. OpenAI API arrives in Pass 2.
 
 ## Run locally
 
@@ -23,6 +23,14 @@ npm run build && npm start      # http://localhost:3000
 For live reloading while editing, run `npm run dev` and open http://localhost:5173.
 
 Development sign-in (`AUTH_MODE=dev`) has no passwords and is blocked from starting in production.
+
+## Preview build (hosted in Claude)
+
+`npm run build:demo` builds `dist/demo/index.html`: the same screens running on an in-browser fictional dataset, with a bar to switch between the client and Rishari views. Nothing is sent to a server. It is for demos only and never holds real client data.
+
+## Brand
+
+Styling follows the Rishari Brand Guidelines v1.0 (July 2026): Inter only, black and white with cool grey bands, dark cyan (#0077A3) for eyebrows and links, square corners, and the wordmark's cyan square as the only bright cyan. Tokens live at the top of `client/src/styles.css`.
 
 ## Tests
 

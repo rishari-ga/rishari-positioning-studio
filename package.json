@@ -12,12 +12,14 @@
     "admin:revoke": "tsx server/scripts/grant-admin.ts revoke",
     "demo:seed": "tsx server/scripts/demo-data.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.client.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:demo": "vite build --config vite.demo.config.ts && node scripts/finish-demo.mjs"
   },
   "license": "UNLICENSED",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1170.0",
     "@clerk/express": "^2.1.91",
+    "@fontsource/inter": "^5.3.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^18.0.10",
     "express": "^4.22.3",
@@ -44,6 +46,7 @@
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
+    "vite-plugin-singlefile": "^2.3.4",
     "vitest": "^5.1.0"
   },
   "private": true,

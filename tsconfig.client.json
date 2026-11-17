@@ -23,6 +23,7 @@
   },
   "include": [
     "client/src",
-    "shared"
+    "shared",
+    "server/seed/questions.ts"
   ]
 }

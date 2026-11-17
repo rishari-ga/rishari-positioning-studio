@@ -24,6 +24,7 @@ function ProjectList() {
   useEffect(() => { load(); }, [load]);
   return (
     <main className="page wide" id="main">
+      <p className="eyebrow">Rishari review</p>
       <h1>Projects</h1>
       <p className="small"><Link to="/admin/data-use">Edit the data-use page</Link></p>
       {!rows ? <p className="muted">Loading...</p> : rows.length === 0 ? <p className="muted">No projects yet.</p> : (
@@ -71,7 +72,7 @@ function ProjectAdmin() {
   const base = `/admin/p/${pid}`;
   return (
     <main className="page wide" id="main">
-      <p className="small"><Link to="/admin">All projects</Link></p>
+      <p className="eyebrow"><Link to="/admin" style={{ color: 'inherit' }}>All projects</Link></p>
       <h1>{o.project.company_name || o.project.name} {o.project.is_fictional && <span className="fictional">Fictional</span>}</h1>
       <nav className="tabs" aria-label="Project views">
         <NavLink end to={base}>Overview</NavLink>
@@ -268,7 +269,7 @@ function DataUseEditor() {
   if (!v) return <p className="page muted">Loading...</p>;
   return (
     <main className="page" id="main">
-      <p className="small"><Link to="/admin">All projects</Link></p>
+      <p className="eyebrow"><Link to="/admin" style={{ color: 'inherit' }}>All projects</Link></p>
       <h1>Data-use page</h1>
       <p className="muted">Clients see this before starting. AI features stay off for client content until this page is marked as reviewed. Don't state legal terms, retention periods, certifications, or data residency you haven't verified.</p>
       <form onSubmit={async (e) => {

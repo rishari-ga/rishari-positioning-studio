@@ -4,6 +4,11 @@ services:
   - type: web
     name: rishari-positioning-studio
     runtime: node
+    plan: starter
+    disk:
+      name: uploads
+      mountPath: /var/data
+      sizeGB: 1
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
@@ -24,21 +29,17 @@ services:
         sync: false
       - key: CLERK_SECRET_KEY
         sync: false
+      # Uploaded documents live on the Render disk above. Render backs up disks with daily snapshots.
       - key: STORAGE_DRIVER
-        value: s3
-      - key: S3_BUCKET
-        sync: false
-      - key: S3_REGION
-        sync: false
-      - key: S3_ENDPOINT
-        sync: false
-      - key: S3_ACCESS_KEY_ID
-        sync: false
-      - key: S3_SECRET_ACCESS_KEY
-        sync: false
+        value: local
+      - key: STORAGE_LOCAL_DIR
+        value: /var/data/uploads
+      - key: STORAGE_PERSISTENT_DISK
+        value: "true"
       - key: AI_ENABLED
         value: "false"
 
 databases:
   - name: rishari-db
     databaseName: rishari
+    plan: basic-256mb

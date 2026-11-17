@@ -44,6 +44,8 @@ export const config = {
   },
 };
 
-if (config.isProd && config.storage.driver === 'local') {
-  throw new Error('STORAGE_DRIVER=local is for development only. Configure S3-compatible storage in production.');
+// In production, local storage is allowed only on a persistent disk (for example a Render disk),
+// and only at an absolute path. Otherwise uploads would vanish on every deploy.
+if (config.isProd && config.storage.driver === 'local' && !(process.env.STORAGE_PERSISTENT_DISK === 'true' && config.storage.localDir.startsWith('/'))) {
+  throw new Error('In production, use S3-compatible storage, or set STORAGE_PERSISTENT_DISK=true with STORAGE_LOCAL_DIR on a mounted persistent disk.');
 }

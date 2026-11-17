@@ -44,7 +44,7 @@ export const config = {
     strategyModel: process.env.STRATEGY_MODEL ?? 'gpt-5.4',
     // Spending caps in US cents, counted per calendar month (UTC).
     projectMonthlyCapCents: Math.round(Number(process.env.AI_PROJECT_MONTHLY_CAP_USD ?? 15) * 100),
-    totalMonthlyCapCents: Math.round(Number(process.env.AI_TOTAL_MONTHLY_CAP_USD ?? 150) * 100),
+    totalMonthlyCapCents: Math.round(Number(process.env.AI_TOTAL_MONTHLY_CAP_USD ?? 25) * 100),
     // USD per million tokens [input, output], from OpenAI's published pricing. Used to estimate cost per job.
     prices: {
       'gpt-5.4': [2.5, 15],

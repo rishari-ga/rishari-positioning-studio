@@ -17,7 +17,19 @@ export function AdminRoutes() {
   );
 }
 
-type Row = { id: string; name: string; company_name: string | null; status: string; is_fictional: boolean; client_email: string | null; answer_count: number; submitted_version: number | null; created_at: string; last_active_at: string | null };
+type Row = { id: string; name: string; company_name: string | null; status: string; is_fictional: boolean; client_email: string | null; answer_count: number; submitted_version: number | null; created_at: string; last_active_at: string | null;
+  core_total: number; core_answered: number; open_flags: number; stage: string };
+
+const Bar = ({ value }: { value: number }) => <span className="meter-track" aria-hidden="true"><span style={{ width: `${value}%` }} /></span>;
+
+export function Meter({ value, label }: { value: number; label?: string }) {
+  return (
+    <span className="meter" title={`${value}%`}>
+      <span className="meter-track" aria-hidden="true"><span style={{ width: `${value}%` }} /></span>
+      <span className="meter-num">{label ?? `${value}%`}</span>
+    </span>
+  );
+}
 
 // "Active now" means the client did something in the last 10 minutes.
 const ACTIVE_MS = 10 * 60 * 1000;
@@ -43,28 +55,32 @@ function ProjectList() {
       <p className="small"><Link to="/admin/data-use">Edit the data-use page</Link> &middot; <Link to="/admin/guidance">Edit the guidance library</Link></p>
       {!rows ? <p className="muted">Loading...</p> : rows.length === 0 ? <p className="muted">No projects yet.</p> : (
         <table>
-          <thead><tr><th>Project</th><th>Client</th><th>Last active</th><th>Status</th><th>Answers</th><th>Submitted</th></tr></thead>
+          <thead><tr><th>Project</th><th>Stage</th><th>Discovery</th><th>Open flags</th><th>Last active</th><th>Client</th></tr></thead>
           <tbody>{rows.map((r) => (
             <tr key={r.id}>
-              <td><Link to={`/admin/p/${r.id}`}>{r.company_name || r.name}</Link> {r.is_fictional && <span className="fictional">Fictional</span>}</td>
-              <td>{r.client_email ?? <span className="muted">Not invited</span>}</td>
+              <td><Link className="row-title" to={`/admin/p/${r.id}`}>{r.company_name || r.name}</Link> {r.is_fictional && <span className="fictional">Fictional</span>}</td>
+              <td><span className="pill">{r.stage}</span></td>
+              <td><Meter value={r.core_total ? Math.round((r.core_answered / r.core_total) * 100) : 0} /></td>
+              <td>{r.open_flags ? <span className="count">{r.open_flags}</span> : <span className="muted">0</span>}</td>
               <td><LastActive at={r.last_active_at} /></td>
-              <td>{r.status}</td><td>{r.answer_count}</td><td>{r.submitted_version ? `v${r.submitted_version}` : '-'}</td>
+              <td className="small">{r.client_email ?? <span className="muted">Not invited</span>}</td>
             </tr>
           ))}</tbody>
         </table>
       )}
       <h2 style={{ marginTop: '2.5rem' }}>New project</h2>
-      <form className="card" onSubmit={async (e) => {
+      <form className="card new-project" onSubmit={async (e) => {
         e.preventDefault(); setErr('');
         try { await api('/api/admin/projects', { method: 'POST', json: { name: form.name, companyName: form.companyName || undefined, isFictional: form.isFictional } }); setForm({ name: '', companyName: '', isFictional: false }); load(); }
         catch (x) { setErr((x as Error).message); }
       }}>
         <div className="field"><label htmlFor="np-name">Project name</label><input id="np-name" type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
         <div className="field"><label htmlFor="np-co">Client company (optional)</label><input id="np-co" type="text" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} /></div>
-        <label className="choice"><input type="checkbox" checked={form.isFictional} onChange={(e) => setForm({ ...form, isFictional: e.target.checked })} /><span>This is a fictional test project</span></label>
-        {err && <p className="notice" role="alert">{err}</p>}
-        <p><button type="submit">Create project</button></p>
+        <div className="np-actions">
+          <label className="choice"><input type="checkbox" checked={form.isFictional} onChange={(e) => setForm({ ...form, isFictional: e.target.checked })} /><span>Fictional test project</span></label>
+          <button type="submit">Create project</button>
+        </div>
+        {err && <p className="notice" role="alert" style={{ gridColumn: '1 / -1' }}>{err}</p>}
       </form>
     </main>
   );
@@ -78,6 +94,14 @@ type Overview = {
   snapshots: { id: string; version: number; kind: string; created_at: string }[];
 };
 
+// Project views grouped by the order the work happens in.
+const NAV: [string, [string, string][]][] = [
+  ['Discovery', [['', 'Overview'], ['answers', 'Answers'], ['connections', 'Connections'], ['narrative', 'Coverage']]],
+  ['Review', [['flags', 'Flags'], ['notes', 'Notes'], ['briefing', 'Briefing']]],
+  ['Strategy', [['approval', 'Source approval'], ['strategy', 'Strategy']]],
+  ['Setup', [['offers', 'Offers and scope'], ['activity', 'Activity']]],
+];
+
 function ProjectAdmin() {
   const { pid } = useParams();
   const [o, setO] = useState<Overview | null>(null);
@@ -89,19 +113,16 @@ function ProjectAdmin() {
     <main className="page wide" id="main">
       <p className="eyebrow"><Link to="/admin" style={{ color: 'inherit' }}>All projects</Link></p>
       <h1>{o.project.company_name || o.project.name} {o.project.is_fictional && <span className="fictional">Fictional</span>}</h1>
-      <nav className="tabs" aria-label="Project views">
-        <NavLink end to={base}>Overview</NavLink>
-        <NavLink to={`${base}/answers`}>Answers</NavLink>
-        <NavLink to={`${base}/connections`}>Connections</NavLink>
-        <NavLink to={`${base}/narrative`}>Coverage</NavLink>
-        <NavLink to={`${base}/flags`}>Flags</NavLink>
-        <NavLink to={`${base}/offers`}>Offers and scope</NavLink>
-        <NavLink to={`${base}/notes`}>Notes</NavLink>
-        <NavLink to={`${base}/briefing`}>Briefing</NavLink>
-        <NavLink to={`${base}/approval`}>Source approval</NavLink>
-        <NavLink to={`${base}/strategy`}>Strategy</NavLink>
-        <NavLink to={`${base}/activity`}>Activity</NavLink>
+      <div className="admin-shell">
+      <nav className="side-nav" aria-label="Project views">
+        {NAV.map(([group, items]) => (
+          <div key={group} className="side-group">
+            <p className="side-label">{group}</p>
+            {items.map(([path, label]) => <NavLink key={path} end={path === ''} to={path ? `${base}/${path}` : base}>{label}</NavLink>)}
+          </div>
+        ))}
       </nav>
+      <div className="admin-body">
       <Routes>
         <Route index element={<OverviewTab o={o} reload={load} />} />
         <Route path="answers" element={<AnswersTab />} />
@@ -115,6 +136,8 @@ function ProjectAdmin() {
         <Route path="notes" element={<NotesTab />} />
         <Route path="activity" element={<ActivityTab />} />
       </Routes>
+      </div>
+      </div>
     </main>
   );
 }
@@ -125,6 +148,7 @@ function OverviewTab({ o, reload }: { o: Overview; reload: () => void }) {
   const [err, setErr] = useState('');
   return (
     <>
+      <Dashboard pid={o.project.id} />
       <section className="card">
         <h2>Client</h2>
         {o.client ? <p>{o.client.display_name ? `${o.client.display_name}, ` : ''}{o.client.email}</p> : (
@@ -148,14 +172,51 @@ function OverviewTab({ o, reload }: { o: Overview; reload: () => void }) {
           </>
         )}
       </section>
-      <section className="card">
-        <h2>Progress</h2>
-        <p>Status: {o.project.status}</p>
-        <p>Process acknowledgment: {o.acknowledgment ? `${o.acknowledgment.ack_version}, ${new Date(o.acknowledgment.created_at).toLocaleString()}` : 'Not yet'}</p>
-        <p>Submitted versions: {o.snapshots.length ? o.snapshots.map((s) => `v${s.version} (${new Date(s.created_at).toLocaleDateString()})`).join(', ') : 'None yet'}</p>
-      </section>
+
       <AiUsage pid={o.project.id} />
       <DeleteProject o={o} />
+    </>
+  );
+}
+
+type Dash = {
+  completion: { answered: number; total: number; pct: number }; coverage: { captured: number; total: number; pct: number };
+  flags: { high: number; medium: number; low: number }; lastActive: string | null; ai: { cents: number; capCents: number };
+  stages: { key: string; label: string; at: string | null }[];
+};
+function Dashboard({ pid }: { pid: string }) {
+  const [d, setD] = useState<Dash | null>(null);
+  useEffect(() => { api<Dash>(`/api/admin/projects/${pid}/dashboard`).then(setD).catch(() => setD(null)); }, [pid]);
+  if (!d) return <div className="tiles skeleton" aria-hidden="true">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="tile" />)}</div>;
+  const openFlags = d.flags.high + d.flags.medium + d.flags.low;
+  const currentIdx = d.stages.reduce((n, s, i) => (s.at ? i : n), -1);
+  const next: Record<string, [string, string]> = {
+    invited: ['Waiting for the client to start', ''], started: ['Client is working through discovery', ''],
+    submitted: ['Review flags, then approve the source', 'flags'], source: ['Develop positioning options', 'strategy'],
+    direction: ['Draft the framework', 'strategy'], draft: ['Review and refine the draft', 'strategy'],
+  };
+  const step = currentIdx >= 0 ? next[d.stages[currentIdx].key] : ['Invite the client below', ''];
+  return (
+    <>
+      <div className="tiles">
+        <div className="tile"><span className="tile-label">Answered</span><span className="tile-num">{d.completion.pct}%</span><Bar value={d.completion.pct} /><span className="tile-sub">{d.completion.answered} of {d.completion.total} core questions</span></div>
+        <div className="tile"><span className="tile-label">Coverage</span><span className="tile-num">{d.coverage.pct}%</span><Bar value={d.coverage.pct} /><span className="tile-sub">{d.coverage.captured} of {d.coverage.total} key fields</span></div>
+        <div className="tile"><span className="tile-label">Open flags</span><span className="tile-num">{openFlags}</span><span className="tile-sub">{d.flags.high} high &middot; {d.flags.medium} medium &middot; {d.flags.low} low</span></div>
+        <div className="tile"><span className="tile-label">Client activity</span><span className="tile-num small-num"><LastActive at={d.lastActive} /></span></div>
+        <div className="tile"><span className="tile-label">AI spend</span><span className="tile-num">${(d.ai.cents / 100).toFixed(2)}</span><span className="tile-sub">this month, of ${(d.ai.capCents / 100).toFixed(0)} cap</span></div>
+      </div>
+      <section className="card stage-card">
+        <ol className="stages">
+          {d.stages.map((s, i) => (
+            <li key={s.key} className={s.at ? (i === currentIdx ? 'current' : 'done') : ''}>
+              <span className="stage-dot" aria-hidden="true" />
+              <span className="stage-name">{s.label}</span>
+              <span className="stage-date">{s.at ? new Date(s.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="small" style={{ margin: '1rem 0 0' }}><strong>Next:</strong> {step[1] ? <Link to={`/admin/p/${pid}/${step[1]}`}>{step[0]}</Link> : step[0]}</p>
+      </section>
     </>
   );
 }

@@ -261,6 +261,7 @@ export function createApp() {
   ap.use(h(async (req, _res, next) => { await requireProjectAccess(req.user!, req.params.pid); next(); }));
 
   ap.get('/', h(async (req, res) => { res.json(await projects.getProjectOverview(req.params.pid)); }));
+  ap.get('/dashboard', h(async (req, res) => { res.json(await projects.projectDashboard(req.user!, req.params.pid)); }));
   ap.post('/invitations', h(async (req, res) => {
     const email = z.string().trim().email().parse(req.body?.email);
     const inv = await projects.createInvitation(req.user!, req.params.pid, email);

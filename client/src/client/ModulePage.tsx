@@ -209,13 +209,13 @@ export function ModulePage() {
   const heading = s.kind === 'question' && s.question.heading_template ? fill(s.question.heading_template, offer, persona) : null;
 
   return (
-    <div className="layout">
-      <aside><ChapterMap current={m.key} /></aside>
-      <main id="main">
+    <div className="focus">
+      <ProgressStrip current={m.key} chapter={mi + 1} title={m.title} />
+      <main id="main" className="focus-main">
         {si === 0 && mi === 0 && <ClarificationBanner />}
-        <p className="eyebrow">Chapter {m.position} of {d.modules.length} &middot; Step {si + 1} of {steps.length}{offer ? <> &middot; {offer.name}</> : null}{persona ? <> &middot; {persona.role_title}</> : null}</p>
-        <h1 ref={headingRef} tabIndex={-1}>{m.title}</h1>
-        <p className="why">{m.why}{m.opening ? <><br /><span className="small">{m.opening}</span></> : null}</p>
+        <p className="eyebrow">Step {si + 1} of {steps.length}{offer ? <> &middot; {offer.name}</> : null}{persona ? <> &middot; {persona.role_title}</> : null}</p>
+        <h1 ref={headingRef} tabIndex={-1} className="chapter-title">{m.title}</h1>
+        {si === 0 ? <p className="why">{m.why}{m.opening ? <><br />{m.opening}</> : null}</p> : <p className="why-short">{m.why}</p>}
         {m.key === 'customer_company' && si === 0 && <Definitions />}
         {['customer_personas', 'problems', 'solution', 'success', 'nothing_changes'].includes(m.key) && si === 0 && <Definitions compact />}
         {needsPersonas && si === 0 && (
@@ -239,12 +239,65 @@ export function ModulePage() {
 
         {isLast && <ModuleAttachments moduleKey={m.key} />}
 
-        <div className="nav-row">
+        <div className="nav-row sticky">
           <button className="secondary" onClick={back} disabled={mi === 0 && si === 0}>Back</button>
+          <span className="small muted nav-hint">Your answers save as you type.</span>
           <button onClick={next}>{isLast && mi === d.modules.length - 1 ? 'Check the connection' : 'Continue'}</button>
         </div>
       </main>
     </div>
+  );
+}
+
+// Overall progress across every question screen, with a rough time estimate.
+function useOverallProgress() {
+  const { d } = useDiscovery();
+  const all = d.modules.flatMap((mod) => stepsFor(d, mod).filter((x) => x.kind === 'question'));
+  const done = all.filter((x) => stepDone(d, x)).length;
+  const left = all.length - done;
+  // Most screens take about a minute; rounded so the estimate doesn't flicker.
+  const mins = Math.max(5, Math.round(left / 5) * 5);
+  const time = mins >= 60 ? `About ${Math.floor(mins / 60)} hr${mins % 60 ? ` ${mins % 60} min` : ''} left` : `About ${mins} min left`;
+  return { pct: all.length ? Math.round((done / all.length) * 100) : 0, left, label: left === 0 ? 'All questions answered' : time };
+}
+
+// A slim strip above the question: where you are, how far along, and the full chapter list in a drawer.
+function ProgressStrip({ current, chapter, title }: { current: string; chapter: number; title: string }) {
+  const { d } = useDiscovery();
+  const p = useOverallProgress();
+  const [open, setOpen] = useState(false);
+  const btn = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    panel.current?.querySelector<HTMLElement>('a[aria-current="page"], a')?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); btn.current?.focus(); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+  useEffect(() => { setOpen(false); }, [current]);
+  return (
+    <>
+      <div className="progress-strip">
+        <button ref={btn} type="button" className="chapters-toggle" aria-expanded={open} aria-controls="chapter-drawer" onClick={() => setOpen(true)}>
+          <span className="burger" aria-hidden="true" />Chapters
+        </button>
+        <span className="strip-where"><strong><span className="strip-long">Chapter </span>{chapter} of {d.modules.length}</strong><span className="strip-title"> &middot; {title}</span></span>
+        <span className="strip-left">{p.label}</span>
+      </div>
+      <div className="progress-bar" role="progressbar" aria-label="Discovery progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.pct}><span style={{ width: `${p.pct}%` }} /></div>
+      {open && (
+        <div className="drawer-wrap" onClick={(e) => { if (e.target === e.currentTarget) { setOpen(false); btn.current?.focus(); } }}>
+          <div className="drawer" id="chapter-drawer" role="dialog" aria-modal="true" aria-label="All chapters" ref={panel}>
+            <div className="drawer-head">
+              <p className="eyebrow" style={{ margin: 0 }}>{p.pct}% complete</p>
+              <button type="button" className="quiet" onClick={() => { setOpen(false); btn.current?.focus(); }}>Close</button>
+            </div>
+            <ChapterMap current={current} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -383,13 +436,15 @@ function QuestionEditor({ q, offer, persona, compact }: { q: Question; offer: Fo
       {draft.reusedFromKey && <p className="small muted">Copied from an earlier answer at your request. Edit it if anything is different here.</p>}
       {input}
       {q.asks_evidence && filled(draft.value) && draft.status === 'answered' && (
-        <div className="field" style={{ marginTop: '0.75rem', marginBottom: 0 }}>
-          <label htmlFor={`${id}-ev`} style={{ fontWeight: 500, fontSize: '0.875rem' }}>How do you know this? (optional)</label>
-          <select id={`${id}-ev`} value={draft.evidenceStatus ?? ''} onChange={(e) => setDraft({ ...draft, evidenceStatus: e.target.value || null }, true)} style={{ maxWidth: '20rem' }}>
-            <option value="">Choose one</option>
-            {EVIDENCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
+        <fieldset className="evidence">
+          <legend>How do you know this? <span className="muted">(optional)</span></legend>
+          <div className="chips">
+            {EVIDENCE_OPTIONS.map((o) => (
+              <button key={o.value} type="button" className="chip" aria-pressed={draft.evidenceStatus === o.value}
+                onClick={() => setDraft({ ...draft, evidenceStatus: draft.evidenceStatus === o.value ? null : o.value }, true)}>{o.label}</button>
+            ))}
+          </div>
+        </fieldset>
       )}
       {(q.allow_not_sure || q.allow_not_applicable) && (
         <div className="alt-actions">

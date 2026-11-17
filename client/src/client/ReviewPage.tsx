@@ -93,7 +93,7 @@ function ModuleControls({ moduleKey, marked, correction, onChange }: { moduleKey
       </button>
       <div className="field" style={{ marginTop: '1rem', marginBottom: 0 }}>
         <label htmlFor={`corr-${moduleKey}`}>Anything to correct in our summary, or to add for this chapter? (optional)</label>
-        <textarea id={`corr-${moduleKey}`} rows={2} value={text} onChange={(e) => setText(e.target.value)}
+        <textarea id={`corr-${moduleKey}`} rows={2} className="short" value={text} onChange={(e) => setText(e.target.value)}
           onBlur={() => { if (text !== correction) save({ clientCorrection: text || null }); }} />
       </div>
       <SaveIndicator status={status} error={err} />

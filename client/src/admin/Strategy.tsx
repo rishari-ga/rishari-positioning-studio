@@ -188,7 +188,15 @@ export function StrategyTab() {
             <ul className="squares small">{current[0].content.unresolvedDecisions.map((d, i) => <li key={i}>{d}</li>)}</ul>
           </div>
         ) : null}
-        {current.map((o) => <OptionCard key={o.id} o={o} chosenId={st.direction?.option_id ?? null} sourceVersion={st.sourceApproved?.version ?? null} onApproved={load} />)}
+        {st.directionCurrent && chosen && current.some((o) => o.id === chosen.id) ? (
+          <>
+            <OptionCard o={chosen} chosenId={chosen.id} sourceVersion={st.sourceApproved?.version ?? null} onApproved={load} />
+            <details className="card" style={{ background: 'var(--grey)', border: 0 }}>
+              <summary className="small">Other options ({current.length - 1})</summary>
+              <div style={{ marginTop: '1rem' }}>{current.filter((o) => o.id !== chosen.id).map((o) => <OptionCard key={o.id} o={o} chosenId={chosen.id} sourceVersion={st.sourceApproved?.version ?? null} onApproved={load} />)}</div>
+            </details>
+          </>
+        ) : current.map((o) => <OptionCard key={o.id} o={o} chosenId={st.direction?.option_id ?? null} sourceVersion={st.sourceApproved?.version ?? null} onApproved={load} />)}
       </section>
 
       <section className="card">
@@ -200,7 +208,32 @@ export function StrategyTab() {
         </p>
         {st.version && <p className="small muted">Version {st.version.version} from source v{st.version.source_version}, {new Date(st.version.created_at).toLocaleString()}. Locked sections are kept as-is when you draft a new version. Draft, not shared.</p>}
       </section>
-      {st.sections.map((s) => <SectionCard key={s.id} pid={pid!} s={s} canRevise={st.directionCurrent} onChange={load} />)}
+      {st.sections.length > 0 && (
+        <div className="doc-layout">
+          <nav className="doc-toc" aria-label="Framework sections">
+            <p className="side-label">Framework v{st.version?.version}</p>
+            <ol>
+              {st.sections.map((s, i) => (
+                <li key={s.id}>
+                  <a href={`#sec-${s.key}`} onClick={(e) => { e.preventDefault(); document.getElementById(`sec-${s.key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
+                    <span className="toc-num">{i + 1}</span><span className="toc-title">{s.content.title}</span>
+                    {s.review.length > 0 && <span className="toc-flag" title={`${s.review.length} review note${s.review.length === 1 ? '' : 's'}`} aria-label="Has review notes" />}
+                    {s.locked && <span className="toc-lock" aria-label="Locked">Locked</span>}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+          <article className="doc">
+            <header className="doc-head">
+              <p className="eyebrow" style={{ marginBottom: '0.4rem' }}>Draft &middot; not shared</p>
+              <h2 style={{ margin: 0 }}>Positioning and messaging framework</h2>
+              <p className="small muted" style={{ margin: '0.4rem 0 0' }}>Version {st.version?.version}, from approved source v{st.version?.source_version}{chosen ? <> &middot; Direction: {(chosen.edited_content ?? chosen.content).name}</> : null}</p>
+            </header>
+            {st.sections.map((s, i) => <SectionCard key={s.id} pid={pid!} s={s} n={i + 1} canRevise={st.directionCurrent} onChange={load} />)}
+          </article>
+        </div>
+      )}
     </>
   );
 }
@@ -242,7 +275,7 @@ function OptionCard({ o, chosenId, sourceVersion, onApproved }: { o: OptionRow; 
   );
 }
 
-function SectionCard({ pid, s, canRevise, onChange }: { pid: string; s: Section; canRevise: boolean; onChange: () => void }) {
+function SectionCard({ pid, s, n, canRevise, onChange }: { pid: string; s: Section; n: number; canRevise: boolean; onChange: () => void }) {
   const [mode, setMode] = useState<'view' | 'edit' | 'revise'>('view');
   const [body, setBody] = useState(s.content.body);
   const [instruction, setInstruction] = useState('');
@@ -250,38 +283,48 @@ function SectionCard({ pid, s, canRevise, onChange }: { pid: string; s: Section;
   useEffect(() => { setBody(s.content.body); }, [s.content.body]);
   const put = (json: object) => api(`/api/admin/projects/${pid}/strategy/sections/${s.id}`, { method: 'PUT', json });
   return (
-    <article className="card" id={`sec-${s.key}`}>
-      <h3 style={{ marginTop: 0 }}>{s.content.title}{s.locked && <span className="tag active">Locked</span>}{s.edited && <span className="tag">Edited</span>}</h3>
+    <section className={`doc-section${s.locked ? ' locked' : ''}`} id={`sec-${s.key}`} aria-labelledby={`h-${s.key}`}>
+      <div className="doc-section-head">
+        <h3 id={`h-${s.key}`}><span className="doc-num">{n}</span>{s.content.title}</h3>
+        <div className="doc-tools small">
+          {s.locked && <span className="tag">Locked</span>}{s.edited && <span className="tag">Edited</span>}
+          {mode === 'view' && <>
+            <button className="link" disabled={s.locked} onClick={() => setMode('edit')}>Edit</button>
+            <button className="link" disabled={s.locked || !canRevise} onClick={() => setMode('revise')}>Regenerate</button>
+            <button className="link" onClick={() => run('', () => put({ locked: !s.locked }).then(onChange))}>{s.locked ? 'Unlock' : 'Lock'}</button>
+          </>}
+        </div>
+      </div>
       {s.review.length > 0 && (
-        <div className="notice small">{s.review.map((r, i) => <p key={i} style={{ margin: i ? '0.3rem 0 0' : 0 }}><strong>{r.severity}:</strong> {r.comment}</p>)}</div>
+        <aside className="review-note">
+          <p className="review-label">Review note{s.review.length === 1 ? '' : 's'}</p>
+          {s.review.map((r, i) => <p key={i}><span className={`sev sev-${r.severity}`}>{r.severity}</span> {r.comment}</p>)}
+        </aside>
       )}
       {mode === 'edit' ? (
         <>
           <label className="sr-only" htmlFor={`sb-${s.id}`}>Section text</label>
           <textarea id={`sb-${s.id}`} rows={12} value={body} onChange={(e) => setBody(e.target.value)} />
-          <p><button onClick={() => run('Saving...', () => put({ body }).then(() => { setMode('view'); onChange(); }))}>Save</button>{' '}<button className="secondary" onClick={() => { setBody(s.content.body); setMode('view'); }}>Cancel</button></p>
+          <p style={{ marginTop: '0.75rem' }}><button onClick={() => run('Saving...', () => put({ body }).then(() => { setMode('view'); onChange(); }))}>Save</button>{' '}<button className="secondary" onClick={() => { setBody(s.content.body); setMode('view'); }}>Cancel</button></p>
         </>
-      ) : <Md text={s.content.body} />}
+      ) : <div className="doc-body"><Md text={s.content.body} /></div>}
       {mode === 'revise' && (
         <div className="field">
           <label htmlFor={`ri-${s.id}`}>What should change?</label>
-          <textarea id={`ri-${s.id}`} rows={2} value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="For example: lead with the cost of late files, and keep it under 60 words." />
-          <p><button disabled={instruction.trim().length < 3 || !!busy} onClick={() => run('Rewriting this section (about 1 minute)...', () => api(`/api/admin/projects/${pid}/strategy/sections/${s.id}/revise`, { method: 'POST', json: { instruction } }).then(() => { setMode('view'); setInstruction(''); onChange(); }))}>Regenerate section</button>{' '}<button className="secondary" onClick={() => setMode('view')}>Cancel</button></p>
+          <textarea id={`ri-${s.id}`} rows={2} className="short" value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="For example: lead with the cost of late files, and keep it under 60 words." />
+          <p style={{ marginTop: '0.75rem' }}><button disabled={instruction.trim().length < 3 || !!busy} onClick={() => run('Rewriting this section (about 1 minute)...', () => api(`/api/admin/projects/${pid}/strategy/sections/${s.id}/revise`, { method: 'POST', json: { instruction } }).then(() => { setMode('view'); setInstruction(''); onChange(); }))}>Regenerate section</button>{' '}<button className="secondary" onClick={() => setMode('view')}>Cancel</button></p>
         </div>
       )}
       {s.content.claims.length > 0 && (
-        <details>
-          <summary className="small">Claims and evidence ({s.content.claims.length})</summary>
-          <ul className="squares small" style={{ marginTop: '0.4rem' }}>{s.content.claims.map((c, i) => <li key={i}>{c.text} <span className="tag">{EVIDENCE[c.evidenceStatus] ?? c.evidenceStatus}</span>{c.sourceRefs.length ? <span className="muted"> {c.sourceRefs.join(', ')}</span> : null} <span className="muted">· External use not yet confirmed</span></li>)}</ul>
+        <details className="evidence-list">
+          <summary className="small">Evidence behind this section ({s.content.claims.length})</summary>
+          <ul>{s.content.claims.map((c, i) => (
+            <li key={i}><span className={`ev ev-${c.evidenceStatus}`}>{EVIDENCE[c.evidenceStatus] ?? c.evidenceStatus}</span> {c.text}{c.sourceRefs.length ? <span className="muted"> &middot; {c.sourceRefs.join(', ')}</span> : null}</li>
+          ))}</ul>
+          <p className="small muted" style={{ margin: '0.4rem 0 0' }}>External use is not confirmed for any claim yet.</p>
         </details>
       )}
-      {mode === 'view' && (
-        <p className="small" style={{ marginBottom: 0 }}>
-          <button className="link" disabled={s.locked} onClick={() => setMode('edit')}>Edit</button> · <button className="link" disabled={s.locked || !canRevise} onClick={() => setMode('revise')}>Regenerate with instructions</button> · <button className="link" onClick={() => run('', () => put({ locked: !s.locked }).then(onChange))}>{s.locked ? 'Unlock' : 'Lock'}</button>
-          {s.model && <span className="muted"> · {s.model}</span>}
-        </p>
-      )}
-      <Status busy={busy} msg={msg} />
-    </article>
+      {(busy || msg) && <Status busy={busy} msg={msg} />}
+    </section>
   );
 }

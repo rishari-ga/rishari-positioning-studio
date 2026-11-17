@@ -27,7 +27,20 @@ export async function listProjectsForAdmin(admin: CurrentUser) {
     SELECT p.*, u.email AS client_email,
       (SELECT count(*) FROM answers a WHERE a.project_id=p.id AND a.status <> 'empty')::int AS answer_count,
       (SELECT max(version) FROM source_snapshots s WHERE s.project_id=p.id AND s.kind='client_intake') AS submitted_version,
-      (SELECT max(last_active_at) FROM project_memberships mm WHERE mm.project_id=p.id) AS last_active_at
+      (SELECT max(last_active_at) FROM project_memberships mm WHERE mm.project_id=p.id) AS last_active_at,
+      (SELECT count(*) FROM questions q JOIN question_versions qv ON qv.question_id=q.id AND qv.version=q.current_version
+         JOIN question_modules qm ON qm.id=q.module_id WHERE q.active AND qm.active AND qv.kind='core' AND NOT qv.per_offer AND NOT qv.per_persona)::int AS core_total,
+      (SELECT count(*) FROM answers a JOIN questions q ON q.id=a.question_id JOIN question_versions qv ON qv.question_id=q.id AND qv.version=q.current_version
+         JOIN question_modules qm ON qm.id=q.module_id WHERE a.project_id=p.id AND a.status <> 'empty' AND q.active AND qm.active AND qv.kind='core' AND NOT qv.per_offer AND NOT qv.per_persona)::int AS core_answered,
+      (SELECT count(*) FROM flags f WHERE f.project_id=p.id AND (f.decision IS NULL OR f.decision NOT IN ('dismissed','resolved')))::int AS open_flags,
+      CASE
+        WHEN EXISTS (SELECT 1 FROM strategy_versions v WHERE v.project_id=p.id) THEN 'Framework drafted'
+        WHEN EXISTS (SELECT 1 FROM approvals a WHERE a.project_id=p.id AND a.approval_type='admin_direction' AND NOT a.stale) THEN 'Direction approved'
+        WHEN EXISTS (SELECT 1 FROM approvals a WHERE a.project_id=p.id AND a.approval_type='admin_source' AND NOT a.stale) THEN 'Source approved'
+        WHEN EXISTS (SELECT 1 FROM source_snapshots s WHERE s.project_id=p.id) THEN 'Submitted'
+        WHEN EXISTS (SELECT 1 FROM acknowledgments k WHERE k.project_id=p.id) THEN 'In discovery'
+        WHEN EXISTS (SELECT 1 FROM invitations i WHERE i.project_id=p.id) THEN 'Invited'
+        ELSE 'Not started' END AS stage
     FROM projects p
     LEFT JOIN project_memberships m ON m.project_id=p.id AND m.role='client_primary'
     LEFT JOIN users u ON u.id=m.user_id
@@ -140,4 +153,43 @@ export async function deleteProject(admin: CurrentUser, projectId: string, confi
   for (const k of keys) { try { await storage.remove(k); } catch { fileErrors++; } }
   await audit({ actorId: admin.id, action: 'project.deleted', targetType: 'project', targetId: projectId, detail: { fictional: p.is_fictional, files: keys.length, fileErrors, anonymizedUsers: clients.length } });
   return { deleted: true, files: keys.length, fileErrors, anonymizedUsers: clients.length };
+}
+
+// Everything the admin Overview needs in one call: progress, coverage, open flags, activity, AI spend, and stage.
+export async function projectDashboard(admin: CurrentUser, projectId: string) {
+  requireAdmin(admin);
+  const p = (await pool.query('SELECT id FROM projects WHERE id=$1', [projectId])).rows[0];
+  if (!p) throw notFound();
+  const { buildIntakeContent, loadQuestionnaire } = await import('./intake.js');
+  const { coverageReport, approvedSourceForGeneration } = await import('./narrative.js');
+  const { usage } = await import('../ai/run.js');
+  const content = await buildIntakeContent(projectId, pool);
+  const coreKeys = new Set((await loadQuestionnaire()).flatMap((m) => m.questions).filter((q) => q.kind === 'core').map((q) => q.key as string));
+  // Same basis as the projects list: company-level core questions.
+  const core = content.modules.flatMap((m) => m.answers).filter((e) => coreKeys.has(e.questionKey) && !e.offerId && !e.personaId);
+  const answered = core.filter((e) => e.status !== 'empty').length;
+  const cov = await coverageReport(projectId, content as never);
+  const important = cov.flatMap((s) => s.scopes.flatMap((sc) => sc.fields)).filter((f) => f.important);
+  const captured = important.filter((f) => f.status === 'captured' || f.status === 'not_applicable').length;
+  const flags = (await pool.query(
+    `SELECT priority, count(*)::int AS n FROM flags WHERE project_id=$1 AND (decision IS NULL OR decision NOT IN ('dismissed','resolved')) GROUP BY priority`, [projectId])).rows;
+  const at = async (sql: string) => ((await pool.query(sql, [projectId])).rows[0]?.t as string | null) ?? null;
+  const stages = [
+    { key: 'invited', label: 'Client invited', at: await at(`SELECT min(created_at) AS t FROM invitations WHERE project_id=$1`) },
+    { key: 'started', label: 'Discovery started', at: await at(`SELECT min(created_at) AS t FROM acknowledgments WHERE project_id=$1`) },
+    { key: 'submitted', label: 'Submitted', at: await at(`SELECT max(created_at) AS t FROM source_snapshots WHERE project_id=$1 AND kind='client_intake'`) },
+    { key: 'source', label: 'Source approved', at: (await approvedSourceForGeneration(projectId)) ? await at(`SELECT max(created_at) AS t FROM approvals WHERE project_id=$1 AND approval_type='admin_source' AND NOT stale`) : null },
+    { key: 'direction', label: 'Direction approved', at: await at(`SELECT max(created_at) AS t FROM approvals WHERE project_id=$1 AND approval_type='admin_direction' AND NOT stale`) },
+    { key: 'draft', label: 'Framework drafted', at: await at(`SELECT max(created_at) AS t FROM strategy_versions WHERE project_id=$1`) },
+  ];
+  const lastActive = await at(`SELECT max(last_active_at) AS t FROM project_memberships WHERE project_id=$1`);
+  const u = await usage(projectId);
+  return {
+    completion: { answered, total: core.length, pct: core.length ? Math.round((answered / core.length) * 100) : 0 },
+    coverage: { captured, total: important.length, pct: important.length ? Math.round((captured / important.length) * 100) : 0 },
+    flags: { high: flags.find((f) => f.priority === 'high')?.n ?? 0, medium: flags.find((f) => f.priority === 'medium')?.n ?? 0, low: flags.find((f) => f.priority === 'low')?.n ?? 0 },
+    lastActive,
+    ai: { cents: u.projectCents, capCents: u.projectCapCents },
+    stages,
+  };
 }

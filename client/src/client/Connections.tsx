@@ -1,3 +1,4 @@
+import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
@@ -43,7 +44,10 @@ export function SummaryCard({ s, projectId, editable, onSaved }: { s: Summary; p
       <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>{company ? 'Customer company' : 'Persona'}</p>
       <h2 id={`sum-${s.personaId ?? 'c'}`} style={{ marginTop: 0 }}>{s.title}</h2>
       {s.subtitle && <p className="small muted">{s.subtitle}</p>}
-      <dl className="summary-grid">
+      <ConnectionFlow s={s} editHref={editable ? editLink : null} />
+      <details className="flow-details">
+        <summary className="small">See every detail</summary>
+      <dl className="summary-grid" style={{ marginTop: '1rem' }}>
         <dt>Goal</dt><dd><Val v={s.goal} /></dd>
         <dt>Problem</dt><dd><Val v={s.problem} />{s.problemDetail && <div className="small muted">{s.problemDetail}</div>}</dd>
         <dt>{company ? 'What addresses it' : 'What helps them'}</dt>
@@ -60,9 +64,10 @@ export function SummaryCard({ s, projectId, editable, onSaved }: { s: Summary; p
         {s.success.map((p) => <PlanRow key={p.label} label={p.label} v={p.value} note={p.evidence} />)}
         {s.consequences.map((p) => <PlanRow key={p.label} label={p.label} v={p.value} note={p.evidence} />)}
       </dl>
+      </details>
       {(s.missing.length > 0 || s.uncertain.length > 0) && (
         <div className="card" style={{ background: 'var(--grey)', border: 0, marginTop: '1rem' }}>
-          {s.missing.length > 0 && <p className="small" style={{ marginBottom: '0.3rem' }}><strong>Missing:</strong> {s.missing.join(', ')}</p>}
+          {!editable && s.missing.length > 0 && <p className="small" style={{ marginBottom: '0.3rem' }}><strong>Missing:</strong> {s.missing.join(', ')}</p>}
           {s.uncertain.length > 0 && <p className="small" style={{ margin: 0 }}><strong>Not certain yet:</strong> {s.uncertain.join('; ')}</p>}
           {editable && <p className="small" style={{ margin: '0.4rem 0 0' }}>It's fine to leave something unknown. You can <Link to={editLink(company ? 'customer_company' : 'problems')}>go back and add it</Link>, or mark this for discussion.</p>}
         </div>
@@ -73,6 +78,48 @@ export function SummaryCard({ s, projectId, editable, onSaved }: { s: Summary; p
     </section>
   );
 }
+// The chain a strategist reads: goal, problem, what helps, the benefit, how success shows up, and the cost of
+// doing nothing. A missing link is drawn with a dashed outline so gaps stand out without any reading.
+type Node = { label: string; value: string | null; extra?: React.ReactNode; chapter: string; uncertain?: boolean };
+function ConnectionFlow({ s, editHref }: { s: Summary; editHref: ((key: string) => string) | null }) {
+  const company = s.scope === 'company';
+  const first = (xs: { value: string | null }[]) => xs.find((x) => x.value && x.value !== 'Not applicable')?.value ?? null;
+  const benefits = s.links.map((l) => (company ? l.howItHelps : l.benefit)).filter(Boolean).join(' ') || null;
+  const unsure = (v: string | null) => !!v && /^(Not sure yet|To discuss with Rishari)$/.test(v);
+  const nodes: Node[] = [
+    { label: 'Goal', value: s.goal, chapter: company ? 'customer_company' : 'customer_personas' },
+    { label: 'Problem', value: s.problem, chapter: company ? 'customer_company' : 'customer_personas' },
+    {
+      label: company ? 'What addresses it' : 'What helps them',
+      value: s.links.length ? s.links.map((l) => l.offerName ?? l.fitLabel).join(', ') : null,
+      extra: s.links.length ? <span className="flow-tags">{s.links.map((l) => <span key={l.id} className={`tag ${l.planned ? 'warn' : ''}`}>{l.fitLabel}</span>)}</span> : null,
+      chapter: 'solution',
+    },
+    { label: company ? 'How it helps' : 'Intended benefit', value: benefits, chapter: 'solution' },
+    { label: 'What success looks like', value: first(s.success), chapter: 'success' },
+    { label: 'If nothing changes', value: first(s.consequences), chapter: 'nothing_changes' },
+  ];
+  const gaps = nodes.filter((n) => !n.value).length;
+  return (
+    <>
+      <p className="flow-score small">{gaps === 0 ? 'Every link is connected.' : `${6 - gaps} of 6 links connected`}</p>
+      <ol className="flow" aria-label={`How ${s.title} connects`}>
+        {nodes.map((n) => {
+          const state = !n.value ? 'missing' : unsure(n.value) || n.uncertain ? 'unsure' : 'ok';
+          return (
+            <li key={n.label} className={`flow-node ${state}`}>
+              <span className="flow-label">{n.label}</span>
+              {state === 'missing'
+                ? <span className="flow-value muted">Missing{editHref && <> &middot; <Link to={editHref(n.chapter)}>Add it</Link></>}</span>
+                : <span className="flow-value">{n.value}{n.extra}</span>}
+            </li>
+          );
+        })}
+      </ol>
+    </>
+  );
+}
+
 const PlanRow = ({ label, v, note }: { label: string; v: string | null; note?: string | null }) => (
   <><dt>{label}</dt><dd><Val v={v} />{v && note && <span className="tag">{note}</span>}</dd></>
 );
@@ -94,7 +141,7 @@ function ReviewControls({ s, onSaved }: { s: Summary; onSaved?: () => void }) {
       <button type="button" className="quiet" aria-pressed={marked} onClick={() => { setMarked(!marked); save(!marked, text); }}>{marked ? 'Marked for discussion' : 'Mark for discussion'}</button>
       <div className="field" style={{ marginTop: '1rem', marginBottom: 0 }}>
         <label htmlFor={id}>Does this connect the right way? Tell us what to correct. (optional)</label>
-        <textarea id={id} rows={2} value={text} onChange={(e) => setText(e.target.value)} onBlur={() => { if (text !== (s.review?.correction ?? '')) save(marked, text); }} />
+        <textarea id={id} rows={2} className="short" value={text} onChange={(e) => setText(e.target.value)} onBlur={() => { if (text !== (s.review?.correction ?? '')) save(marked, text); }} />
       </div>
       <SaveIndicator status={status} error={err} />
     </div>

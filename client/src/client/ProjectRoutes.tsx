@@ -7,7 +7,8 @@ import { Welcome } from './Welcome';
 import { ModulePage } from './ModulePage';
 import { ReviewPage, DonePage } from './ReviewPage';
 
-type Ctx = { d: Discovery; reload: () => Promise<void>; patchAnswer: (questionId: string, revision: number, value: unknown, status: string, contextNote: string | null) => void };
+type Patch = { questionId: string; offerId: string | null; revision: number; value: unknown; status: string; contextNote: string | null; evidenceStatus: string | null; reusedFromKey: string | null };
+type Ctx = { d: Discovery; reload: () => Promise<void>; patchAnswer: (p: Patch) => void };
 const DiscoveryCtx = createContext<Ctx | null>(null);
 export const useDiscovery = () => {
   const c = useContext(DiscoveryCtx);
@@ -27,11 +28,16 @@ export function ProjectRoutes() {
   }, [pid]);
   useEffect(() => { reload(); }, [reload]);
 
-  const patchAnswer = useCallback((questionId: string, revision: number, value: unknown, status: string, contextNote: string | null) => {
+  const patchAnswer = useCallback((p: Patch) => {
     setD((cur) => {
       if (!cur) return cur;
-      const others = cur.answers.filter((a) => a.question_id !== questionId);
-      return { ...cur, answers: [...others, { question_id: questionId, value, status: status as never, context_note: contextNote, revision }] };
+      const others = cur.answers.filter((a) => !(a.question_id === p.questionId && (a.offer_id ?? null) === p.offerId));
+      return {
+        ...cur,
+        answers: [...others, { question_id: p.questionId, offer_id: p.offerId, value: p.value, status: p.status as never, context_note: p.contextNote,
+          evidence_status: p.evidenceStatus, reused_from_key: p.reusedFromKey, revision: p.revision }],
+        clarifications: p.status === 'empty' ? cur.clarifications : cur.clarifications.filter((c) => !(c.question_key === cur.modules.flatMap((m) => m.questions).find((q) => q.id === p.questionId)?.key && (c.offer_id ?? null) === p.offerId)),
+      };
     });
   }, []);
 
@@ -54,6 +60,6 @@ export function ProjectRoutes() {
 
 function firstOpenModule(d: Discovery): string {
   const answered = new Set(d.answers.filter((a) => a.status !== 'empty').map((a) => a.question_id));
-  const m = d.modules.find((mod) => mod.questions.some((q) => q.kind === 'core' && !answered.has(q.id)));
+  const m = d.modules.find((mod) => mod.questions.some((q) => q.kind === 'core' && !q.per_offer && !answered.has(q.id)));
   return (m ?? d.modules[0]).key;
 }

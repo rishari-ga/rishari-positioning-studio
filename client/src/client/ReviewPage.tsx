@@ -2,12 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CONFIRMATION } from '@shared/content';
 import { api } from '../api';
-import type { Answer, Question } from '../api';
+import { findAnswer } from '../api';
+import type { Answer, Question, Discovery, Module, FocusOffer } from '../api';
+import { renderPrompt, EVIDENCE_OPTIONS, ROLE_OPTIONS } from '@shared/narrative';
 import { useDiscovery } from './ProjectRoutes';
-import { ChapterMap, SaveIndicator, moduleSteps } from './ModulePage';
+import { ChapterMap, SaveIndicator, stepIndexFor, ClarificationBanner } from './ModulePage';
 import type { SaveStatus } from './useAutosave';
 
-const STATUS_LABEL: Record<string, string> = { not_sure: "Not sure yet", discuss: 'Discuss with Rishari' };
+const STATUS_LABEL: Record<string, string> = { not_sure: 'Not sure yet', discuss: 'Discuss with Rishari', not_applicable: 'Not applicable' };
+export const evidenceLabel = (v: string | null) => EVIDENCE_OPTIONS.find((o) => o.value === v)?.label ?? null;
 
 export function formatValue(q: Pick<Question, 'input_type'>, a: Answer | undefined): string | null {
   if (!a || a.value == null) return null;
@@ -34,35 +37,16 @@ export function ReviewPage() {
         <p className="eyebrow">Before you submit</p>
         <h1 ref={h1} tabIndex={-1}>{CONFIRMATION.heading}</h1>
         <p className="lede">Here's everything you shared, in your own words. Correct anything that's off, and mark any chapter you'd like to talk through.</p>
+        <ClarificationBanner />
         {d.submissions.length > 0 && <p className="ok">You submitted version {d.submissions[0].version} on {new Date(d.submissions[0].created_at).toLocaleDateString()}. Submitting again creates a new version. The earlier one is kept.</p>}
 
         {d.modules.map((m) => {
           const prog = d.progress.find((p) => p.module_id === m.id);
-          const steps = moduleSteps(m);
           return (
             <section key={m.id} className="card" aria-labelledby={`rv-${m.key}`}>
               <h2 id={`rv-${m.key}`}>{m.title}</h2>
               <p className="small muted">Summary: an organized summary will appear here once AI-assisted review is turned on. Your original answers below are what we'll review.</p>
-              {m.questions.map((q) => {
-                if (q.kind === 'offer_list') {
-                  return (
-                    <div className="answer-block" key={q.id}>
-                      <p className="q">{q.prompt}</p>
-                      {d.offers.length ? <ul className="plain">{d.offers.map((o) => <li key={o.id}>{o.name}{o.availability ? ` (${o.availability})` : ''}</li>)}</ul> : <p className="muted">No offers listed.</p>}
-                    </div>
-                  );
-                }
-                const a = d.answers.find((x) => x.question_id === q.id);
-                const text = formatValue(q, a);
-                const stepIndex = steps.findIndex((s) => s.kind === 'fields' ? s.questions.some((x) => x.id === q.id) : s.question.id === q.id);
-                return (
-                  <div className="answer-block" key={q.id}>
-                    <p className="q">{q.prompt}{a && STATUS_LABEL[a.status] && <span className="tag warn">{STATUS_LABEL[a.status]}</span>}</p>
-                    {text ? <p className="a">{text}</p> : <p className="muted">Not answered.</p>}
-                    <Link className="small" to={`/p/${d.project.id}/m/${m.key}/${stepIndex}`}>Return to this answer</Link>
-                  </div>
-                );
-              })}
+              <ModuleAnswers d={d} m={m} linkBase={`/p/${d.project.id}`} />
               <ModuleControls moduleKey={m.key} marked={prog?.marked_for_discussion ?? false} correction={prog?.client_correction ?? ''} onChange={reload} />
             </section>
           );
@@ -121,5 +105,64 @@ export function DonePage() {
       <h1 className="display">{CONFIRMATION.completion[0]}</h1>
       <p className="lede">{CONFIRMATION.completion[1]}</p>
     </main>
+  );
+}
+
+// Original answers for one chapter: company questions, then each focus offer. Shared by the client review and the admin view.
+export function ModuleAnswers({ d, m, linkBase }: { d: Discovery; m: Module; linkBase?: string }) {
+  const company = m.questions.filter((q) => !q.per_offer || !d.focusOffers.length);
+  const perOffer = d.focusOffers.length ? m.questions.filter((q) => q.per_offer) : [];
+  const block = (q: Question, offer: FocusOffer | null) => {
+    if (q.kind === 'offer_list') {
+      return (
+        <div className="answer-block" key={q.id}>
+          <p className="q">{q.prompt}</p>
+          {d.offers.length ? <ul className="squares">{d.offers.map((o) => <li key={o.id}>{o.name}{o.availability ? ` (${o.availability})` : ''}</li>)}</ul> : <p className="muted">No offers listed.</p>}
+        </div>
+      );
+    }
+    if (q.kind === 'stakeholder_map') {
+      const people = d.stakeholders.filter((p) => (p.offer_id ?? null) === (offer?.id ?? null));
+      return (
+        <div className="answer-block" key={`${q.id}-${offer?.id}`}>
+          <p className="q">{renderPrompt(q, offer)}</p>
+          {people.length ? people.map((p) => (
+            <div key={p.id} style={{ marginBottom: '0.6rem' }}>
+              <strong>{p.label}</strong> <span className="small muted">{p.roles.map((r) => ROLE_OPTIONS.find((o) => o.value === r)?.label ?? r).join(', ')}</span>
+              {p.desired_outcome && <div className="small">Wants: {p.desired_outcome}</div>}
+              {p.wants_to_prevent && <div className="small">Wants to prevent: {p.wants_to_prevent}</div>}
+              {p.needs_to_believe && <div className="small">Needs to believe: {p.needs_to_believe}</div>}
+              {p.evidence_status && <span className="tag">{evidenceLabel(p.evidence_status)}</span>}
+            </div>
+          )) : <p className="muted">No one listed yet.</p>}
+        </div>
+      );
+    }
+    const a = findAnswer(d, q.id, offer?.id ?? null);
+    if (q.kind === 'probe' && (!a || a.status === 'empty')) return null;
+    const text = formatValue(q, a);
+    const at = linkBase ? stepIndexFor(d, q.key, offer?.id ?? null) : null;
+    return (
+      <div className="answer-block" key={`${q.id}-${offer?.id}`} style={q.kind === 'probe' ? { paddingLeft: '1rem' } : undefined}>
+        <p className="q">{renderPrompt(q, offer)}
+          {a && STATUS_LABEL[a.status] && <span className="tag warn">{STATUS_LABEL[a.status]}</span>}
+          {a?.evidence_status && <span className="tag">{evidenceLabel(a.evidence_status)}</span>}
+          {a?.reused_from_key && <span className="tag">From an earlier answer</span>}
+        </p>
+        {text ? <p className="a">{text}</p> : a?.status === 'not_applicable' ? null : <p className="muted">Not answered.</p>}
+        {at && <Link className="small" to={`${linkBase}/m/${at.moduleKey}/${at.index}`}>Return to this answer</Link>}
+      </div>
+    );
+  };
+  return (
+    <>
+      {company.map((q) => block(q, null))}
+      {d.focusOffers.map((o) => perOffer.length > 0 && (
+        <div key={o.id} style={{ marginTop: '1rem' }}>
+          <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>{o.name}{o.availability === 'planned' ? ' (planned)' : ''}</p>
+          {perOffer.map((q) => block(q, o))}
+        </div>
+      ))}
+    </>
   );
 }

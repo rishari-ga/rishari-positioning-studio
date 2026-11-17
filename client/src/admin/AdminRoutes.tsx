@@ -2,13 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Discovery, Offer } from '../api';
-import { formatValue } from '../client/ReviewPage';
+import { ModuleAnswers } from '../client/ReviewPage';
+import { NarrativeTab, FlagsTab, SourceApprovalTab, GuidanceEditor } from './Narrative';
 
 export function AdminRoutes() {
   return (
     <Routes>
       <Route index element={<ProjectList />} />
       <Route path="data-use" element={<DataUseEditor />} />
+      <Route path="guidance" element={<GuidanceEditor />} />
       <Route path="p/:pid/*" element={<ProjectAdmin />} />
     </Routes>
   );
@@ -26,7 +28,7 @@ function ProjectList() {
     <main className="page wide" id="main">
       <p className="eyebrow">Rishari review</p>
       <h1>Projects</h1>
-      <p className="small"><Link to="/admin/data-use">Edit the data-use page</Link></p>
+      <p className="small"><Link to="/admin/data-use">Edit the data-use page</Link> &middot; <Link to="/admin/guidance">Edit the guidance library</Link></p>
       {!rows ? <p className="muted">Loading...</p> : rows.length === 0 ? <p className="muted">No projects yet.</p> : (
         <table>
           <thead><tr><th>Project</th><th>Client</th><th>Status</th><th>Answers</th><th>Submitted</th></tr></thead>
@@ -77,13 +79,19 @@ function ProjectAdmin() {
       <nav className="tabs" aria-label="Project views">
         <NavLink end to={base}>Overview</NavLink>
         <NavLink to={`${base}/answers`}>Answers</NavLink>
+        <NavLink to={`${base}/narrative`}>Narrative</NavLink>
+        <NavLink to={`${base}/flags`}>Flags</NavLink>
         <NavLink to={`${base}/offers`}>Offers and scope</NavLink>
         <NavLink to={`${base}/notes`}>Notes</NavLink>
+        <NavLink to={`${base}/approval`}>Source approval</NavLink>
         <NavLink to={`${base}/activity`}>Activity</NavLink>
       </nav>
       <Routes>
         <Route index element={<OverviewTab o={o} reload={load} />} />
         <Route path="answers" element={<AnswersTab />} />
+        <Route path="narrative" element={<NarrativeTab />} />
+        <Route path="flags" element={<FlagsTab />} />
+        <Route path="approval" element={<SourceApprovalTab />} />
         <Route path="offers" element={<OffersTab />} />
         <Route path="notes" element={<NotesTab />} />
         <Route path="activity" element={<ActivityTab />} />
@@ -136,7 +144,6 @@ function AnswersTab() {
   const [d, setD] = useState<Discovery | null>(null);
   useEffect(() => { api<Discovery>(`/api/admin/projects/${pid}/answers`).then(setD); }, [pid]);
   if (!d) return <p className="muted">Loading...</p>;
-  const statusLabel = (s: string) => (s === 'not_sure' ? 'Not sure yet' : s === 'discuss' ? 'Discuss with Rishari' : null);
   return (
     <>
       <p className="muted small">Live answers in the client's own words. Submitted versions are frozen separately.</p>
@@ -146,17 +153,7 @@ function AnswersTab() {
         return (
           <section key={m.id} className="card">
             <h2>{m.title} {prog?.marked_for_discussion && <span className="tag warn">Marked for discussion</span>}</h2>
-            {m.questions.map((q) => {
-              if (q.kind === 'offer_list') return <p key={q.id} className="small muted">Offers: see the Offers and scope tab ({d.offers.length}).</p>;
-              const a = d.answers.find((x) => x.question_id === q.id);
-              const text = formatValue(q, a);
-              return (
-                <div className="answer-block" key={q.id}>
-                  <p className="q">{q.prompt}{a && statusLabel(a.status) && <span className="tag warn">{statusLabel(a.status)}</span>}</p>
-                  {text ? <p className="a">{text}</p> : <p className="muted small">No answer.</p>}
-                </div>
-              );
-            })}
+            <ModuleAnswers d={d} m={m} />
             {prog?.client_correction && <p><strong>Client correction:</strong> {prog.client_correction}</p>}
             {files.length > 0 && <p className="small">Attachments: {files.map((f) => <AttachmentLink key={f.id} pid={pid!} id={f.id} name={f.original_name} />)}</p>}
             <NoteForm topicType="module" topicId={m.id} />

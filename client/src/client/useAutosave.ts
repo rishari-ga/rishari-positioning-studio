@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
-export type Draft = { value: unknown; status: 'answered' | 'not_sure' | 'discuss' | 'empty'; contextNote: string | null };
+export type Draft = { value: unknown; status: 'answered' | 'not_sure' | 'discuss' | 'empty' | 'not_applicable'; contextNote: string | null; evidenceStatus?: string | null; reusedFromKey?: string | null };
 
 // Debounced autosave with retry and a visible failure state. Saves never call AI.
-export function useAutosave(projectId: string, questionKey: string, initial: Draft, initialRevision: number, onSaved: (rev: number, d: Draft) => void) {
+export function useAutosave(projectId: string, questionKey: string, offerId: string | null, initial: Draft, initialRevision: number, onSaved: (rev: number, d: Draft) => void) {
   const [draft, setDraftState] = useState<Draft>(initial);
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState('');
@@ -21,8 +21,8 @@ export function useAutosave(projectId: string, questionKey: string, initial: Dra
     inFlight.current = true;
     setStatus('saving');
     try {
-      const r = await api<{ revision: number }>(`/api/projects/${projectId}/answers/${questionKey}`, {
-        method: 'PUT', json: { value: d.value, status: d.status, contextNote: d.contextNote, baseRevision: rev.current },
+      const r = await api<{ revision: number }>(`/api/projects/${projectId}/answers/${questionKey}${offerId ? `?offerId=${offerId}` : ''}`, {
+        method: 'PUT', json: { value: d.value, status: d.status, contextNote: d.contextNote, evidenceStatus: d.evidenceStatus ?? null, reusedFromKey: d.reusedFromKey ?? null, baseRevision: rev.current },
       });
       rev.current = r.revision;
       if (pending.current === d) pending.current = null;
@@ -41,7 +41,7 @@ export function useAutosave(projectId: string, questionKey: string, initial: Dra
       inFlight.current = false;
     }
     if (pending.current) void flush();
-  }, [projectId, questionKey, onSaved]);
+  }, [projectId, questionKey, offerId, onSaved]);
 
   const setDraft = useCallback((d: Draft, immediate = false) => {
     setDraftState(d);

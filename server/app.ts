@@ -13,6 +13,7 @@ import * as projects from './services/projects.js';
 import * as intake from './services/intake.js';
 import * as files from './services/attachments.js';
 import * as admin from './services/admin.js';
+import * as narrative from './services/narrative.js';
 import { pool } from './db/pool.js';
 
 // Simple fixed-window rate limiter keyed by user or IP.
@@ -92,7 +93,28 @@ export function createApp() {
   pr.put('/answers/:questionKey', h(async (req, res) => {
     const user = requireUser(req);
     await requireClientMember(user, req.params.pid);
-    res.json(await intake.saveAnswer(user, req.params.pid, req.params.questionKey, intake.saveAnswerInput.parse(req.body)));
+    const offerId = typeof req.query.offerId === 'string' && req.query.offerId ? req.query.offerId : null;
+    if (offerId) assertUuid(offerId);
+    res.json(await intake.saveAnswer(user, req.params.pid, req.params.questionKey, offerId, intake.saveAnswerInput.parse(req.body)));
+  }));
+
+  pr.post('/stakeholders', h(async (req, res) => {
+    const user = requireUser(req);
+    await requireClientMember(user, req.params.pid);
+    res.json(await intake.upsertStakeholder(user, req.params.pid, null, intake.stakeholderInput.parse(req.body)));
+  }));
+  pr.put('/stakeholders/:sid', h(async (req, res) => {
+    const user = requireUser(req);
+    await requireClientMember(user, req.params.pid);
+    assertUuid(req.params.sid);
+    res.json(await intake.upsertStakeholder(user, req.params.pid, req.params.sid, intake.stakeholderInput.parse(req.body)));
+  }));
+  pr.delete('/stakeholders/:sid', h(async (req, res) => {
+    const user = requireUser(req);
+    await requireClientMember(user, req.params.pid);
+    assertUuid(req.params.sid);
+    await intake.deleteStakeholder(user, req.params.pid, req.params.sid);
+    res.json({ ok: true });
   }));
 
   pr.post('/offers', h(async (req, res) => {
@@ -205,7 +227,28 @@ export function createApp() {
     res.json(await admin.getSnapshot(req.user!, req.params.pid, z.coerce.number().int().positive().parse(req.params.version)));
   }));
   ap.get('/activity', h(async (req, res) => { res.json(await admin.activity(req.user!, req.params.pid)); }));
+  ap.get('/narrative', h(async (req, res) => {
+    res.json({ coverage: await narrative.coverageReport(req.params.pid), clarifications: await narrative.listClarifications(req.user!, req.params.pid) });
+  }));
+  ap.put('/coverage', h(async (req, res) => { await narrative.setCoverageOverride(req.user!, req.params.pid, narrative.overrideInput.parse(req.body)); res.json({ ok: true }); }));
+  ap.post('/clarifications', h(async (req, res) => { res.json(await narrative.requestClarification(req.user!, req.params.pid, narrative.clarificationInput.parse(req.body))); }));
+  ap.post('/clarifications/:cid/withdraw', h(async (req, res) => {
+    assertUuid(req.params.cid);
+    const r = await pool.query(`UPDATE clarification_requests SET status='withdrawn' WHERE id=$1 AND project_id=$2 AND status='open' RETURNING id`, [req.params.cid, req.params.pid]);
+    if (!r.rows[0]) throw new HttpError(404, 'not_found', 'Not found');
+    res.json({ ok: true });
+  }));
+  ap.post('/checks', h(async (req, res) => { res.json(await narrative.runProjectChecks(req.user!, req.params.pid)); }));
+  ap.get('/flags', h(async (req, res) => { res.json(await narrative.listFlags(req.user!, req.params.pid)); }));
+  ap.patch('/flags/:fid', h(async (req, res) => {
+    assertUuid(req.params.fid);
+    res.json(await narrative.decideFlag(req.user!, req.params.pid, req.params.fid, narrative.flagDecisionInput.parse(req.body)));
+  }));
+  ap.get('/source-approval', h(async (req, res) => { res.json(await narrative.getSourceApproval(req.user!, req.params.pid)); }));
+  ap.post('/source-approval', h(async (req, res) => { res.json(await narrative.approveSource(req.user!, req.params.pid, narrative.approveSourceInput.parse(req.body))); }));
 
+  ad.get('/guidance', h(async (req, res) => { res.json(await narrative.listGuidance(req.user!)); }));
+  ad.put('/guidance/:key', h(async (req, res) => { await narrative.updateGuidance(req.user!, req.params.key, narrative.guidanceInput.parse(req.body)); res.json({ ok: true }); }));
   ad.get('/data-use', h(async (_req, res) => { res.json(await admin.getDataUse()); }));
   ad.put('/data-use', h(async (req, res) => { await admin.saveDataUse(req.user!, req.body); res.json({ ok: true }); }));
 

@@ -24,6 +24,7 @@
   "include": [
     "client/src",
     "shared",
-    "server/seed/questions.ts"
+    "server/seed/questions.ts",
+    "server/seed/guidance.ts"
   ]
 }

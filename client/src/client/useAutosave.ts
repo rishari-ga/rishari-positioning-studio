@@ -5,7 +5,7 @@ export type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
 export type Draft = { value: unknown; status: 'answered' | 'not_sure' | 'discuss' | 'empty' | 'not_applicable'; contextNote: string | null; evidenceStatus?: string | null; reusedFromKey?: string | null };
 
 // Debounced autosave with retry and a visible failure state. Saves never call AI.
-export function useAutosave(projectId: string, questionKey: string, offerId: string | null, initial: Draft, initialRevision: number, onSaved: (rev: number, d: Draft) => void) {
+export function useAutosave(projectId: string, questionKey: string, offerId: string | null, personaId: string | null, initial: Draft, initialRevision: number, onSaved: (rev: number, d: Draft) => void) {
   const [draft, setDraftState] = useState<Draft>(initial);
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [error, setError] = useState('');
@@ -21,7 +21,8 @@ export function useAutosave(projectId: string, questionKey: string, offerId: str
     inFlight.current = true;
     setStatus('saving');
     try {
-      const r = await api<{ revision: number }>(`/api/projects/${projectId}/answers/${questionKey}${offerId ? `?offerId=${offerId}` : ''}`, {
+      const qs = new URLSearchParams([...(offerId ? [['offerId', offerId]] : []), ...(personaId ? [['personaId', personaId]] : [])]).toString();
+      const r = await api<{ revision: number }>(`/api/projects/${projectId}/answers/${questionKey}${qs ? `?${qs}` : ''}`, {
         method: 'PUT', json: { value: d.value, status: d.status, contextNote: d.contextNote, evidenceStatus: d.evidenceStatus ?? null, reusedFromKey: d.reusedFromKey ?? null, baseRevision: rev.current },
       });
       rev.current = r.revision;
@@ -41,7 +42,7 @@ export function useAutosave(projectId: string, questionKey: string, offerId: str
       inFlight.current = false;
     }
     if (pending.current) void flush();
-  }, [projectId, questionKey, offerId, onSaved]);
+  }, [projectId, questionKey, offerId, personaId, onSaved]);
 
   const setDraft = useCallback((d: Draft, immediate = false) => {
     setDraftState(d);

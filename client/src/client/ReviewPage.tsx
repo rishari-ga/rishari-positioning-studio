@@ -4,7 +4,9 @@ import { CONFIRMATION } from '@shared/content';
 import { api } from '../api';
 import { findAnswer } from '../api';
 import type { Answer, Question, Discovery, Module, FocusOffer } from '../api';
-import { renderPrompt, EVIDENCE_OPTIONS, ROLE_OPTIONS } from '@shared/narrative';
+import { renderPrompt, EVIDENCE_OPTIONS, PURCHASE_ROLES, FIT_OPTIONS } from '@shared/narrative';
+import { priorityPersonas } from '../api';
+import type { Persona } from '../api';
 import { useDiscovery } from './ProjectRoutes';
 import { ChapterMap, SaveIndicator, stepIndexFor, ClarificationBanner } from './ModulePage';
 import type { SaveStatus } from './useAutosave';
@@ -84,7 +86,7 @@ function ModuleControls({ moduleKey, marked, correction, onChange }: { moduleKey
     catch (x) { setStatus('failed'); setErr((x as Error).message); }
   };
   return (
-    <div style={{ borderTop: '1px solid var(--brand-line)', paddingTop: '1rem' }}>
+    <div style={{ borderTop: '1px solid var(--hairline)', paddingTop: '1rem' }}>
       <button type="button" className="quiet" aria-pressed={marked} onClick={() => save({ markedForDiscussion: !marked })}>
         {marked ? 'Marked for discussion' : 'Mark for discussion'}
       </button>
@@ -108,43 +110,79 @@ export function DonePage() {
   );
 }
 
-// Original answers for one chapter: company questions, then each focus offer. Shared by the client review and the admin view.
+// Original answers for one chapter: company questions, then each focus offer, then each priority persona.
+// Shared by the client review and the admin view.
 export function ModuleAnswers({ d, m, linkBase }: { d: Discovery; m: Module; linkBase?: string }) {
-  const company = m.questions.filter((q) => !q.per_offer || !d.focusOffers.length);
-  const perOffer = d.focusOffers.length ? m.questions.filter((q) => q.per_offer) : [];
-  const block = (q: Question, offer: FocusOffer | null) => {
+  const personas = priorityPersonas(d);
+  const company = m.questions.filter((q) => !q.per_persona && (!q.per_offer || !d.focusOffers.length) && !(q.kind === 'solution_links' && q.per_persona));
+  const companyQs = company.filter((q) => !(q.kind === 'solution_links' && q.key === 'sl_persona'));
+  const perOffer = d.focusOffers.length ? m.questions.filter((q) => q.per_offer && !q.per_persona) : [];
+  const perPersona = m.questions.filter((q) => q.per_persona || q.key === 'sl_persona');
+  const offerName = (id: string | null) => d.offers.find((o) => o.id === id)?.name;
+  const linkList = (personaId: string | null) => {
+    const ls = d.links.filter((l) => (l.persona_id ?? null) === personaId);
+    return ls.length ? ls.map((l) => (
+      <div key={l.id} style={{ marginBottom: '0.5rem' }}>
+        <strong>{offerName(l.offer_id) ?? FIT_OPTIONS.find((f) => f.value === l.fit)?.label}</strong> <span className="tag">{FIT_OPTIONS.find((f) => f.value === l.fit)?.label}</span>
+        {l.capability && <div className="small">{l.capability}</div>}
+        {l.how_it_helps && <div className="small">How: {l.how_it_helps}</div>}
+        {l.benefit && <div className="small">Intended benefit: {l.benefit}</div>}
+        {l.out_of_scope && <div className="small muted">Outside its scope: {l.out_of_scope}</div>}
+        {l.evidence_status && <span className="tag">{evidenceLabel(l.evidence_status)}</span>}
+      </div>
+    )) : <p className="muted">Not connected yet.</p>;
+  };
+  const block = (q: Question, offer: FocusOffer | null, persona: Persona | null) => {
+    const key = `${q.id}-${offer?.id}-${persona?.id}`;
     if (q.kind === 'offer_list') {
       return (
-        <div className="answer-block" key={q.id}>
+        <div className="answer-block" key={key}>
           <p className="q">{q.prompt}</p>
-          {d.offers.length ? <ul className="squares">{d.offers.map((o) => <li key={o.id}>{o.name}{o.availability ? ` (${o.availability})` : ''}</li>)}</ul> : <p className="muted">No offers listed.</p>}
+          {d.offers.length ? <ul className="squares">{d.offers.map((o) => <li key={o.id}>{o.name}{o.availability ? ` (${o.availability})` : ''}</li>)}</ul> : <p className="muted">No products or services listed.</p>}
         </div>
       );
     }
-    if (q.kind === 'stakeholder_map') {
-      const people = d.stakeholders.filter((p) => (p.offer_id ?? null) === (offer?.id ?? null));
+    if (q.kind === 'customer_groups') {
       return (
-        <div className="answer-block" key={`${q.id}-${offer?.id}`}>
-          <p className="q">{renderPrompt(q, offer)}</p>
-          {people.length ? people.map((p) => (
+        <div className="answer-block" key={key}>
+          <p className="q">{q.prompt}</p>
+          {d.customerGroups.length ? <ul className="squares">{d.customerGroups.map((g) => <li key={g.id}>{g.name}{g.is_priority && <span className="tag">Focus first</span>}</li>)}</ul> : <p className="muted">Not answered.</p>}
+        </div>
+      );
+    }
+    if (q.kind === 'personas') {
+      return (
+        <div className="answer-block" key={key}>
+          <p className="q">{q.prompt}</p>
+          {d.personas.length ? d.personas.map((p) => (
             <div key={p.id} style={{ marginBottom: '0.6rem' }}>
-              <strong>{p.label}</strong> <span className="small muted">{p.roles.map((r) => ROLE_OPTIONS.find((o) => o.value === r)?.label ?? r).join(', ')}</span>
-              {p.desired_outcome && <div className="small">Wants: {p.desired_outcome}</div>}
-              {p.wants_to_prevent && <div className="small">Wants to prevent: {p.wants_to_prevent}</div>}
-              {p.needs_to_believe && <div className="small">Needs to believe: {p.needs_to_believe}</div>}
+              <strong>{p.role_title}</strong> <span className="small muted">{p.purchase_roles.map((r) => PURCHASE_ROLES.find((o) => o.value === r)?.label ?? r).join(', ')}</span>
+              {!p.is_priority && <span className="tag">Not a priority</span>}{p.needs_confirmation && <span className="tag warn">Needs confirming</span>}
+              {p.responsibility && <div className="small">Responsible for: {p.responsibility}</div>}
+              {p.goal && <div className="small">Trying to achieve: {p.goal}</div>}
+              {p.problem && <div className="small">Problem: {p.problem}</div>}
               {p.evidence_status && <span className="tag">{evidenceLabel(p.evidence_status)}</span>}
             </div>
-          )) : <p className="muted">No one listed yet.</p>}
+          )) : <p className="muted">No personas yet.</p>}
         </div>
       );
     }
-    const a = findAnswer(d, q.id, offer?.id ?? null);
+    if (q.kind === 'solution_links') return <div className="answer-block" key={key}><p className="q">{renderPrompt(q, offer, persona)}</p>{linkList(persona?.id ?? null)}</div>;
+    if (q.kind === 'persona_fields') {
+      return (
+        <div className="answer-block" key={key}>
+          <p className="q">{q.prompt}</p>
+          {personas.map((p) => { const a = findAnswer(d, q.id, null, p.id); return <div key={p.id} className="small"><strong>{p.role_title}:</strong> {formatValue(q, a) ?? <span className="muted">Not answered.</span>}</div>; })}
+        </div>
+      );
+    }
+    const a = findAnswer(d, q.id, offer?.id ?? null, persona?.id ?? null);
     if (q.kind === 'probe' && (!a || a.status === 'empty')) return null;
     const text = formatValue(q, a);
-    const at = linkBase ? stepIndexFor(d, q.key, offer?.id ?? null) : null;
+    const at = linkBase ? stepIndexFor(d, q.key, offer?.id ?? null, persona?.id ?? null) : null;
     return (
-      <div className="answer-block" key={`${q.id}-${offer?.id}`} style={q.kind === 'probe' ? { paddingLeft: '1rem' } : undefined}>
-        <p className="q">{renderPrompt(q, offer)}
+      <div className="answer-block" key={key} style={q.kind === 'probe' ? { paddingLeft: '1rem' } : undefined}>
+        <p className="q">{renderPrompt(q, offer, persona)}
           {a && STATUS_LABEL[a.status] && <span className="tag warn">{STATUS_LABEL[a.status]}</span>}
           {a?.evidence_status && <span className="tag">{evidenceLabel(a.evidence_status)}</span>}
           {a?.reused_from_key && <span className="tag">From an earlier answer</span>}
@@ -156,11 +194,17 @@ export function ModuleAnswers({ d, m, linkBase }: { d: Discovery; m: Module; lin
   };
   return (
     <>
-      {company.map((q) => block(q, null))}
+      {companyQs.map((q) => block(q, null, null))}
       {d.focusOffers.map((o) => perOffer.length > 0 && (
         <div key={o.id} style={{ marginTop: '1rem' }}>
           <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>{o.name}{o.availability === 'planned' ? ' (planned)' : ''}</p>
-          {perOffer.map((q) => block(q, o))}
+          {perOffer.map((q) => block(q, o, null))}
+        </div>
+      ))}
+      {perPersona.length > 0 && personas.map((p) => (
+        <div key={p.id} style={{ marginTop: '1rem' }}>
+          <p className="eyebrow" style={{ marginBottom: '0.25rem' }}>Persona: {p.role_title}</p>
+          {perPersona.map((q) => block(q, null, p))}
         </div>
       ))}
     </>

@@ -19,16 +19,17 @@ export type User = { id: string; email: string; displayName: string | null; isAd
 
 export type Question = {
   id: string; key: string; module_id: string; position: number; version: number;
-  kind: 'core' | 'field' | 'offer_list' | 'labeled_examples' | 'probe' | 'stakeholder_map';
-  input_type: 'short_text' | 'long_text' | 'url' | 'single_select' | 'multi_select' | 'offer_list' | 'labeled_examples' | 'stakeholder_map';
+  kind: 'core' | 'field' | 'offer_list' | 'labeled_examples' | 'probe' | 'stakeholder_map' | 'customer_groups' | 'personas' | 'solution_links' | 'persona_fields';
+  input_type: string;
   prompt: string; help_text: string | null; thinking_prompts: string[]; options: string[]; allow_not_sure: boolean;
   per_offer: boolean; planned_prompt: string | null; probe_of: string | null; narrative_field: string | null;
   asks_evidence: boolean; allow_not_applicable: boolean; reuse_from: string[]; probe_always: boolean; na_label: string | null;
+  per_persona: boolean; heading_template: string | null; part_label: string | null;
 };
 export type Module = { id: string; key: string; position: number; title: string; why: string; opening: string | null; questions: Question[] };
 export type AnswerStatus = 'answered' | 'not_sure' | 'discuss' | 'empty' | 'not_applicable';
 export type Answer = {
-  question_id: string; offer_id: string | null; value: unknown; status: AnswerStatus; context_note: string | null;
+  question_id: string; offer_id: string | null; persona_id: string | null; value: unknown; status: AnswerStatus; context_note: string | null;
   evidence_status: string | null; reused_from_key: string | null; revision: number;
 };
 export type FocusOffer = { id: string; name: string; availability: string | null };
@@ -36,7 +37,10 @@ export type Stakeholder = {
   id: string; offer_id: string | null; label: string; roles: string[]; desired_outcome: string | null; wants_to_prevent: string | null;
   needs_to_believe: string | null; decision_role: string | null; evidence_status: string | null;
 };
-export type Clarification = { id: string; question_key: string; offer_id: string | null; note: string | null; status: string; created_at: string };
+export type Clarification = { id: string; question_key: string; offer_id: string | null; persona_id: string | null; note: string | null; status: string; created_at: string };
+export type { Persona, CustomerGroup, SolutionLink, ConnectionReview, Summary } from '@shared/narrative';
+import type { Persona, CustomerGroup, SolutionLink, ConnectionReview } from '@shared/narrative';
+export type EarlierAnswer = { question_key: string; prompt: string; offer_name: string | null; value: unknown; status: string };
 export type Offer = {
   id: string; name: string; description: string | null; intended_customer: string | null; availability: 'available' | 'pilot' | 'planned' | null;
   pricing_approach: string | null; delivery_model: string | null; priority: number | null; in_scope?: boolean;
@@ -52,10 +56,16 @@ export type Discovery = {
   focusOffers: FocusOffer[];
   stakeholders: Stakeholder[];
   clarifications: Clarification[];
+  customerGroups: CustomerGroup[];
+  personas: Persona[];
+  links: SolutionLink[];
+  connectionReviews: ConnectionReview[];
+  earlierAnswers: EarlierAnswer[];
 };
+export const priorityPersonas = (d: Pick<Discovery, 'personas'>) => d.personas.filter((p) => p.is_priority);
 
-export const findAnswer = (d: Pick<Discovery, 'answers'>, questionId: string, offerId: string | null) =>
-  d.answers.find((a) => a.question_id === questionId && (a.offer_id ?? null) === offerId);
+export const findAnswer = (d: Pick<Discovery, 'answers'>, questionId: string, offerId: string | null, personaId: string | null = null) =>
+  d.answers.find((a) => a.question_id === questionId && (a.offer_id ?? null) === offerId && (a.persona_id ?? null) === personaId);
 
 export function hasContent(a: Answer | undefined): boolean {
   if (!a) return false;

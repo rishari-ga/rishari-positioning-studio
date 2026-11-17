@@ -3,7 +3,7 @@ import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom';
 import { api } from '../api';
 import type { Discovery, Offer } from '../api';
 import { ModuleAnswers } from '../client/ReviewPage';
-import { NarrativeTab, FlagsTab, SourceApprovalTab, GuidanceEditor } from './Narrative';
+import { NarrativeTab, FlagsTab, SourceApprovalTab, GuidanceEditor, ConnectionsTab } from './Narrative';
 
 export function AdminRoutes() {
   return (
@@ -79,7 +79,8 @@ function ProjectAdmin() {
       <nav className="tabs" aria-label="Project views">
         <NavLink end to={base}>Overview</NavLink>
         <NavLink to={`${base}/answers`}>Answers</NavLink>
-        <NavLink to={`${base}/narrative`}>Narrative</NavLink>
+        <NavLink to={`${base}/connections`}>Connections</NavLink>
+        <NavLink to={`${base}/narrative`}>Coverage</NavLink>
         <NavLink to={`${base}/flags`}>Flags</NavLink>
         <NavLink to={`${base}/offers`}>Offers and scope</NavLink>
         <NavLink to={`${base}/notes`}>Notes</NavLink>
@@ -89,6 +90,7 @@ function ProjectAdmin() {
       <Routes>
         <Route index element={<OverviewTab o={o} reload={load} />} />
         <Route path="answers" element={<AnswersTab />} />
+        <Route path="connections" element={<ConnectionsTab />} />
         <Route path="narrative" element={<NarrativeTab />} />
         <Route path="flags" element={<FlagsTab />} />
         <Route path="approval" element={<SourceApprovalTab />} />
@@ -160,6 +162,18 @@ function AnswersTab() {
           </section>
         );
       })}
+      {d.earlierAnswers.length > 0 && (
+        <section className="card">
+          <h2>Earlier answers to retired questions</h2>
+          <p className="small muted">These questions were replaced in an update. The answers are kept and offered back to the client where they fit.</p>
+          {d.earlierAnswers.map((e, i) => (
+            <div className="answer-block" key={i}>
+              <p className="q">{e.prompt.replaceAll('{offer}', e.offer_name ?? 'this offer')}</p>
+              <p className="a">{typeof e.value === 'string' ? e.value : e.value == null ? e.status.replace('_', ' ') : JSON.stringify(e.value)}</p>
+            </div>
+          ))}
+        </section>
+      )}
     </>
   );
 }

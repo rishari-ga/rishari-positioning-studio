@@ -144,15 +144,16 @@ describe('Test 2: an early-stage client without proof points can finish', () => 
     await b.post(`/api/projects/${projectB}/acknowledgment`).send({ version: ACK.version }).expect(200);
     await b.put(`/api/projects/${projectB}/answers/m1_what`).send({ value: 'Fictional prelaunch idea.', status: 'answered' }).expect(200);
     await b.put(`/api/projects/${projectB}/answers/m9_learned`).send({ value: null, status: 'not_sure' }).expect(200);
-    await b.put(`/api/projects/${projectB}/answers/m5_first`).send({ value: null, status: 'discuss' }).expect(200);
-    await b.put(`/api/projects/${projectB}/modules/fit/progress`).send({ markedForDiscussion: true }).expect(200);
+    await b.put(`/api/projects/${projectB}/answers/cc_goal`).send({ value: null, status: 'discuss' }).expect(200);
+    await b.put(`/api/projects/${projectB}/answers/m5_first`).send({ value: 'x', status: 'answered' }).expect(404); // retired question
+    await b.put(`/api/projects/${projectB}/modules/success/progress`).send({ markedForDiscussion: true }).expect(200);
     await b.post(`/api/projects/${projectB}/submit`).send({ confirmed: false, idempotencyKey: 'abcdefgh-1' }).expect(400);
     const s1 = await b.post(`/api/projects/${projectB}/submit`).send({ confirmed: true, idempotencyKey: 'abcdefgh-1' }).expect(200);
     const retry = await b.post(`/api/projects/${projectB}/submit`).send({ confirmed: true, idempotencyKey: 'abcdefgh-1' }).expect(200);
     expect(retry.body.id).toBe(s1.body.id);
     const snaps = (await pool.query('SELECT * FROM source_snapshots WHERE project_id=$1', [projectB])).rows;
     expect(snaps).toHaveLength(1);
-    expect(snaps[0].content.modules.find((m: { key: string }) => m.key === 'fit').markedForDiscussion).toBe(true);
+    expect(snaps[0].content.modules.find((m: { key: string }) => m.key === 'success').markedForDiscussion).toBe(true);
     const approval = (await pool.query("SELECT * FROM approvals WHERE project_id=$1 AND approval_type='client_intake_confirmation'", [projectB])).rows[0];
     expect(approval.target_id).toBe(snaps[0].id);
     expect(approval.target_version).toBe('1');

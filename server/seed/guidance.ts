@@ -114,4 +114,41 @@ export const GUIDANCE: Guidance[] = [
     why: 'One message for everyone tends to persuade no one in particular.',
     clientQuestion: 'Is there anyone in this decision who wants something different or worries about something different from the main buyer?',
   },
+  // Persona update, Section 10
+  {
+    key: 'problem_without_offer', issue: 'A problem has no linked product or service.', action: 'Connect the problem to what addresses it, or confirm that nothing fits yet.',
+    example: 'Knowing the office manager loses hours to manual entry is useful. Knowing which service removes that work, or that none does yet, is what the message needs.',
+    why: 'A problem without a solution attached cannot become a reason to buy.',
+    clientQuestion: 'Which of your products or services helps with this problem, if any?',
+  },
+  {
+    key: 'offer_without_explanation', issue: 'A product or service is linked without explaining how it helps.', action: 'Explain how it addresses the problem.',
+    example: '"Monthly bookkeeping" names the service. "We reconcile accounts every month, so the owner sees accurate numbers before making decisions" explains how it helps.',
+    why: 'Buyers need to see the connection between what you do and the problem they have.',
+    clientQuestion: 'How does this product or service address the problem?',
+  },
+  {
+    key: 'persona_company_confused', issue: 'A persona benefit is the same as the company benefit.', action: 'Separate what the company gains from what this persona gains.',
+    example: '"The firm closes the month faster" is a company benefit. "The controller stops working late at month end" is a persona benefit. Both can be true.',
+    why: 'Each persona decides based on what changes for them, not only for the company.',
+    clientQuestion: 'Apart from what the company gains, what changes for this persona?',
+  },
+  {
+    key: 'persona_success_unclear', issue: 'Persona success is unclear.', action: 'Clarify the intended benefit.',
+    example: "'A dashboard' is a feature. 'Spotting overdue work without checking several systems' is an intended benefit, if the dashboard supports that.",
+    why: 'We need to explain why this persona would care.',
+    clientQuestion: 'What can this persona do better because they have it?',
+  },
+  {
+    key: 'plan_missing_customer_role', issue: "The plan is missing the customer's responsibilities.", action: 'Describe what the customer company and each relevant persona need to do.',
+    example: '"We set up the system" leaves out the customer. "Your office manager sends last year\'s files in week one" tells them what to expect.',
+    why: 'Customers feel more confident when they know what will be expected of them.',
+    clientQuestion: 'What does the customer company need to do for this to work?',
+  },
+  {
+    key: 'persona_offer_mismatch', issue: "A persona is linked to a product or service without a clear reason.", action: 'Confirm which part addresses this persona\'s problem, or remove the link.',
+    example: 'Linking the finance director to the onboarding service may be right, but only if it addresses a problem the finance director has.',
+    why: 'Pairing a persona with something that does not address their problem weakens the message for everyone.',
+    clientQuestion: "Which part of it addresses this persona's problem?",
+  },
 ];

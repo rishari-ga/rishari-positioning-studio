@@ -94,8 +94,37 @@ export function createApp() {
     const user = requireUser(req);
     await requireClientMember(user, req.params.pid);
     const offerId = typeof req.query.offerId === 'string' && req.query.offerId ? req.query.offerId : null;
+    const personaId = typeof req.query.personaId === 'string' && req.query.personaId ? req.query.personaId : null;
     if (offerId) assertUuid(offerId);
-    res.json(await intake.saveAnswer(user, req.params.pid, req.params.questionKey, offerId, intake.saveAnswerInput.parse(req.body)));
+    if (personaId) assertUuid(personaId);
+    res.json(await intake.saveAnswer(user, req.params.pid, req.params.questionKey, offerId, intake.saveAnswerInput.parse(req.body), personaId));
+  }));
+
+  // Customer companies, personas, product links, and connection reviews: client-owned, server-checked.
+  const crud = (path: string, upsert: (u: never, pid: string, id: string | null, body: never) => Promise<unknown>, del: (u: never, pid: string, id: string) => Promise<void>, schema: { parse: (x: unknown) => unknown }) => {
+    pr.post(`/${path}`, h(async (req, res) => {
+      const user = requireUser(req); await requireClientMember(user, req.params.pid);
+      res.json(await upsert(user as never, req.params.pid, null, schema.parse(req.body) as never));
+    }));
+    pr.put(`/${path}/:id`, h(async (req, res) => {
+      const user = requireUser(req); await requireClientMember(user, req.params.pid); assertUuid(req.params.id);
+      res.json(await upsert(user as never, req.params.pid, req.params.id, schema.parse(req.body) as never));
+    }));
+    pr.delete(`/${path}/:id`, h(async (req, res) => {
+      const user = requireUser(req); await requireClientMember(user, req.params.pid); assertUuid(req.params.id);
+      await del(user as never, req.params.pid, req.params.id); res.json({ ok: true });
+    }));
+  };
+  crud('customer-groups', intake.upsertGroup as never, intake.deleteGroup as never, intake.groupInput);
+  crud('personas', intake.upsertPersona as never, intake.deletePersona as never, intake.personaInput);
+  crud('links', intake.upsertLink as never, intake.deleteLink as never, intake.linkInput);
+  pr.put('/connection-review', h(async (req, res) => {
+    const user = requireUser(req); await requireClientMember(user, req.params.pid);
+    await intake.saveConnectionReview(user, req.params.pid, intake.reviewInput.parse(req.body)); res.json({ ok: true });
+  }));
+  pr.get('/connections', h(async (req, res) => {
+    const user = requireUser(req); await requireProjectAccess(user, req.params.pid);
+    res.json(await narrative.connections(req.params.pid));
   }));
 
   pr.post('/stakeholders', h(async (req, res) => {
@@ -245,6 +274,7 @@ export function createApp() {
     res.json(await narrative.decideFlag(req.user!, req.params.pid, req.params.fid, narrative.flagDecisionInput.parse(req.body)));
   }));
   ap.get('/source-approval', h(async (req, res) => { res.json(await narrative.getSourceApproval(req.user!, req.params.pid)); }));
+  ap.get('/source-brief', h(async (req, res) => { res.json(await narrative.sourceBrief(req.user!, req.params.pid)); }));
   ap.post('/source-approval', h(async (req, res) => { res.json(await narrative.approveSource(req.user!, req.params.pid, narrative.approveSourceInput.parse(req.body))); }));
 
   ad.get('/guidance', h(async (req, res) => { res.json(await narrative.listGuidance(req.user!)); }));

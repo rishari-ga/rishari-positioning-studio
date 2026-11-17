@@ -3,8 +3,8 @@
 
 export type SeedQuestion = {
   key: string;
-  kind: 'core' | 'field' | 'offer_list' | 'labeled_examples' | 'probe' | 'stakeholder_map';
-  input: 'short_text' | 'long_text' | 'url' | 'single_select' | 'multi_select' | 'offer_list' | 'labeled_examples' | 'stakeholder_map';
+  kind: 'core' | 'field' | 'offer_list' | 'labeled_examples' | 'probe' | 'stakeholder_map' | 'customer_groups' | 'personas' | 'solution_links' | 'persona_fields';
+  input: 'short_text' | 'long_text' | 'url' | 'single_select' | 'multi_select' | 'offer_list' | 'labeled_examples' | 'stakeholder_map' | 'customer_groups' | 'personas' | 'solution_links' | 'persona_fields';
   prompt: string;
   help?: string;
   thinking?: string[];
@@ -21,9 +21,13 @@ export type SeedQuestion = {
   allowNA?: boolean;          // offer a not-applicable choice
   naLabel?: string;
   reuseFrom?: string[];       // earlier questions that may already cover this
+  // Persona update
+  perPersona?: boolean;       // asked once for each priority persona; {persona} becomes the persona's role
+  heading?: string;           // screen heading, e.g. "What this problem means for {persona}"
+  part?: string;              // visible part label, e.g. "Part A: How your product or service helps"
 };
 
-export type SeedModule = { key: string; title: string; why: string; opening?: string; questions: SeedQuestion[] };
+export type SeedModule = { key: string; title: string; why: string; opening?: string; revision?: number; questions: SeedQuestion[] };
 
 const core = (key: string, prompt: string, extra: Partial<SeedQuestion> = {}): SeedQuestion => ({
   key, kind: 'core', input: 'long_text', prompt, allowNotSure: true, ...extra,
@@ -34,8 +38,9 @@ const field = (key: string, prompt: string, input: SeedQuestion['input'] = 'shor
 
 const BASE_MODULES: SeedModule[] = [
   {
-    key: 'business', title: 'Business and priorities',
+    key: 'business', title: 'Your company', revision: 2,
     why: 'We need to understand what exists today and what this work needs to help you accomplish.',
+    opening: 'Your company is the business you are completing this discovery for.',
     questions: [
       field('m1_company', 'Company name'),
       field('m1_website', 'Website, if you have one', 'url'),
@@ -71,8 +76,9 @@ const BASE_MODULES: SeedModule[] = [
     ],
   },
   {
-    key: 'offers', title: 'Offer inventory',
-    why: 'The company story and individual product stories may need to do different jobs.',
+    key: 'offers', title: 'Your products and services', revision: 2,
+    why: 'The company story and the story for each product or service may need to do different jobs.',
+    opening: 'A product or service is what you sell to help a customer solve a problem. List each one separately.',
     questions: [
       { key: 'm3_offers', kind: 'offer_list', input: 'offer_list', prompt: 'List what you offer, or plan to offer.', help: 'Add each product or service separately. Pricing is optional.', allowNotSure: false },
       core('m3_most', 'Which offer matters most right now?'),
@@ -295,17 +301,156 @@ const NARRATIVE: Record<string, SeedQuestion[]> = {
   ],
 };
 
-export const MODULES: SeedModule[] = BASE_MODULES.map((m) => ({ ...m, questions: [...m.questions, ...(NARRATIVE[m.key] ?? [])] }));
+// ---------------------------------------------------------------------------
+// Personas and connected plans (persona update spec). Plain language, about a
+// 10th grade reading level. Company questions are about the priority customer
+// company; persona questions repeat for each priority persona.
+// ---------------------------------------------------------------------------
+const cq = (key: string, prompt: string, extra: Partial<SeedQuestion> = {}): SeedQuestion => ({
+  key, kind: 'core', input: 'long_text', prompt, allowNotSure: true, evidence: true, ...extra,
+});
+const pq = (key: string, prompt: string, extra: Partial<SeedQuestion> = {}): SeedQuestion => cq(key, prompt, { perPersona: true, ...extra });
+const pp = (key: string, of: string, prompt: string, extra: Partial<SeedQuestion> = {}): SeedQuestion => ({
+  key, kind: 'probe', input: 'long_text', prompt, allowNotSure: true, probeOf: of, ...extra,
+});
+
+const PERSONA_MODULES: SeedModule[] = [
+  {
+    key: 'customer_company', title: 'Your customer company',
+    why: "Describe the business most likely to benefit from your product or service. We'll look at the people inside it next.",
+    questions: [
+      { key: 'cc_groups', kind: 'customer_groups', input: 'customer_groups', allowNotSure: false, field: 'company.type',
+        prompt: 'What type of company are you focusing on first?',
+        help: "Describe it in a few words, like the industry, size, or situation that makes it a good fit. If you serve more than one type, add each one and choose which to focus on first. We'll keep the others separate.",
+        reuseFrom: ['m5_first', 'm5_benefits', 'm1_markets'] },
+      cq('cc_goal', 'What is this customer company trying to achieve?', { field: 'company.goal', reuseFrom: ['m4_better', 'n_char_goal'] }),
+      cq('cc_problem', 'What problem is getting in its way?', { field: 'company.problem', reuseFrom: ['m4_frustrating', 'n_prob_practical'] }),
+      cq('cc_effect', 'How does that problem affect the business?', {
+        field: 'company.problem_effect',
+        thinking: ["You might think about time, cost, workload, growth, quality, risk, or customer experience. Include only what applies. You don't need numbers."],
+      }),
+    ],
+  },
+  {
+    key: 'customer_personas', title: 'Your customer personas',
+    why: 'Different people may need different things from the same purchase. Add the main personas involved in choosing, approving, or using your product or service.',
+    questions: [
+      { key: 'cp_personas', kind: 'personas', input: 'personas', allowNotSure: false, field: 'personas',
+        prompt: 'Who are the main personas?',
+        help: "Add one persona at a time. Name each one by role, like \"Operations manager.\" You don't need made-up names, ages, or personal details. One persona can play several parts in the purchase.",
+        reuseFrom: ['m6_roles'] },
+    ],
+  },
+  {
+    key: 'problems', title: 'Their problems',
+    why: "We've identified the main problem. Now let's understand what it means for the company and each persona.",
+    questions: [
+      cq('pr_prevents', 'What does this problem prevent the customer company from doing?', { field: 'company.prevents' }),
+      cq('pr_affected', 'Who else in the business is affected?', { field: 'company.affected', evidence: false, reuseFrom: ['n_prob_others'] }),
+      pq('p_work', 'What happens in their work because of this problem?', {
+        heading: 'What this problem means for {persona}', field: 'persona.work_impact', reuseFrom: ['n_prob_internal'],
+        thinking: ["You might think about extra work, missed deadlines, difficult conversations, stress, uncertainty, or loss of confidence. Include only what's true."],
+      }),
+      pq('p_personal', 'How does dealing with it affect them personally, if at all?', {
+        heading: 'What this problem means for {persona}', field: 'persona.personal_impact', allowNA: true, reuseFrom: ['n_prob_confidence'],
+        help: "If you don't know, choose \"I'm not sure yet.\" We won't guess how anyone feels.",
+      }),
+      pq('p_should', 'What do they believe should work better than it does today?', {
+        heading: 'What this problem means for {persona}', field: 'persona.should_work', allowNA: true, reuseFrom: ['n_prob_philosophical'],
+      }),
+    ],
+  },
+  {
+    key: 'solution', title: 'Your solution and plan',
+    why: 'Connect each problem to the product or service that addresses it. Then explain how the customer moves from the problem to a better outcome.',
+    questions: [
+      { key: 'sl_company', kind: 'solution_links', input: 'solution_links', allowNotSure: false, field: 'company.solution',
+        part: 'Part A: How your product or service helps',
+        prompt: 'Which product or service addresses this company problem?',
+        help: "Add a connection for each product or service that helps. If nothing you offer fits yet, say so. That's useful to know." },
+      { key: 'sl_persona', kind: 'solution_links', input: 'solution_links', allowNotSure: false, perPersona: true, field: 'persona.solution',
+        part: 'Part A: How your product or service helps', heading: 'How you help {persona}',
+        prompt: 'Which product or service helps this persona?',
+        help: "One product or service can help several personas in different ways. It's also fine if nothing fits this persona directly." },
+      cq('pl_steps', 'What are the main steps from getting started to receiving value?', {
+        part: "Part B: The customer's plan", field: 'plan.steps', evidence: false, reuseFrom: ['n_plan_steps'],
+        help: "Explain what the customer does and what you do to put the solution to work. Describe what the customer experiences, not a list of features. Use as many steps as it really takes.",
+      }),
+      cq('pl_we', 'What does your company handle?', { part: "Part B: The customer's plan", field: 'plan.we_handle', evidence: false, reuseFrom: ['n_plan_roles'] }),
+      cq('pl_customer', 'What does the customer company need to do?', { part: "Part B: The customer's plan", field: 'plan.customer_does', evidence: false }),
+      { key: 'pl_personas', kind: 'persona_fields', input: 'persona_fields', allowNotSure: true, field: 'persona.plan_role',
+        part: "Part B: The customer's plan", prompt: 'What does each relevant persona need to do?',
+        help: "One shared plan is usually enough. Note only what each persona does. Leave a persona blank if they don't take part." },
+      cq('pl_confidence', 'What support or commitments help the customer feel confident?', {
+        part: "Part B: The customer's plan", field: 'plan.confidence', evidence: false, reuseFrom: ['n_plan_commit'],
+        help: "Only include support and commitments you actually provide. We won't add guarantees.",
+      }),
+    ],
+  },
+  {
+    key: 'success', title: 'What success looks like',
+    why: "Describe the better outcome you are working toward. You don't need measured results yet. We'll separate expected benefits from results you have already seen.",
+    questions: [
+      cq('sc_company', 'If this works, what improves for the customer company?', { field: 'company.success', reuseFrom: ['n_success_business'] }),
+      cq('sc_signal', 'How would the company recognize success?', { field: 'company.success_signals', reuseFrom: ['n_success_signal'] }),
+      pq('sp_do', 'What can this persona do more easily or effectively?', { heading: 'What success looks like for {persona}', field: 'persona.success' }),
+      pp('sp_team', 'sp_do', 'What might their manager or team notice?', { perPersona: true, field: 'persona.success_team' }),
+      pp('sp_measures', 'sp_do', 'What measures do they already use?', { perPersona: true, field: 'persona.success_measures' }),
+      pp('sp_needs', 'sp_do', 'What needs to happen for this outcome to be possible?', { perPersona: true, field: 'persona.success_dependencies' }),
+      pq('sp_know', 'How would they know the solution is helping?', { heading: 'What success looks like for {persona}', field: 'persona.success_signals' }),
+      pq('sp_personal', 'What would success mean for them personally, if relevant?', {
+        heading: 'What success looks like for {persona}', field: 'persona.success_personal', allowNA: true, reuseFrom: ['n_success_person'],
+      }),
+    ],
+  },
+  {
+    key: 'nothing_changes', title: 'What happens if nothing changes',
+    why: 'Describe the realistic consequences of leaving the problem unresolved. We are not looking for scare tactics.',
+    questions: [
+      cq('nc_keep', 'If this problem continues, what does the customer company keep dealing with?', { field: 'company.consequence', reuseFrom: ['n_fail_continue'] }),
+      cq('nc_harder', 'What could become harder, more costly, or more risky?', { field: 'company.consequence_risk', reuseFrom: ['n_fail_harder'] }),
+      pp('nc_support', 'nc_harder', 'What supports that expectation?', { field: 'company.consequence_support' }),
+      pp('nc_exaggerate', 'nc_harder', 'What would be an exaggeration?', { field: 'company.consequence_limits' }),
+      pq('np_keep', 'If nothing changes, what does this persona keep facing?', { heading: 'What {persona} wants to avoid', field: 'persona.consequence' }),
+      pq('np_prevent', 'What outcome do they most want to prevent?', { heading: 'What {persona} wants to avoid', field: 'persona.prevent', reuseFrom: ['n_fail_prevent'] }),
+      pp('np_support', 'np_prevent', 'What supports that expectation?', { perPersona: true, field: 'persona.consequence_support' }),
+      pp('np_exaggerate', 'np_prevent', 'What would be an exaggeration?', { perPersona: true, field: 'persona.consequence_limits' }),
+    ],
+  },
+];
+
+// Chapters and questions replaced by the persona chapters. They stop being asked; their answers are kept.
+export const RETIRED_MODULES = ['situation', 'fit', 'buying'];
+export const RETIRED_QUESTIONS = [
+  'n_fail_continue', 'n_fail_harder', 'n_fail_observed', 'n_fail_support', 'n_fail_overstate', 'n_fail_who', 'n_fail_prevent',
+  'n_success_business', 'n_success_team', 'n_success_colleagues', 'n_success_outside', 'n_success_horizon', 'n_success_person', 'n_success_signal', 'n_success_measures',
+  'n_plan_steps', 'n_plan_how', 'n_plan_roles', 'n_plan_onboarding', 'n_plan_support', 'n_plan_commit', 'n_plan_learn', 'n_plan_limits',
+];
+
+const ORDER = ['business', 'origin', 'offers', 'customer_company', 'customer_personas', 'problems', 'solution', 'success', 'nothing_changes',
+  'alternatives', 'differentiation', 'credibility', 'voice', 'action'];
+
+const withNarrative: SeedModule[] = BASE_MODULES.map((m) => ({ ...m, questions: [...m.questions, ...(NARRATIVE[m.key] ?? [])] }));
+const byKey = new Map([...withNarrative, ...PERSONA_MODULES].map((m) => [m.key, m]));
+
+// Every module the seed knows, active ones in display order first. Retired questions are filtered out of active modules.
+export const ALL_MODULES: SeedModule[] = [...ORDER, ...RETIRED_MODULES].map((k) => byKey.get(k)!);
+export const MODULES: SeedModule[] = ORDER.map((k) => byKey.get(k)!).map((m) => ({ ...m, questions: m.questions.filter((q) => !RETIRED_QUESTIONS.includes(q.key)) }));
 
 export const EVIDENCE_STATUSES = ['observed', 'customer_reported', 'founder_belief', 'planned', 'unknown'] as const;
 
+// Draft for "How we use your information". Rishari must replace the "To be completed by Rishari" lines
+// before the page can be marked reviewed. No legal terms, retention periods, or certifications are claimed.
 export const DATA_USE_DEFAULT = {
   reviewed: false,
   sections: [
-    { heading: 'What we collect', body: 'To be completed by Rishari before inviting clients.' },
-    { heading: 'Why we collect it', body: 'To be completed by Rishari before inviting clients.' },
-    { heading: 'Service providers', body: 'To be completed by Rishari. List hosting (Render), sign-in (Clerk), file storage, and AI (OpenAI) providers, and link to their terms.' },
-    { heading: 'Retention and deletion', body: 'To be completed by Rishari. Do not state a retention period until it has been decided.' },
-    { heading: 'Contact', body: 'To be completed by Rishari.' },
+    { heading: 'How this discovery works', body: "This discovery is the first step in working with Rishari. It gathers what we need to understand your company, your customers, and your products or services before we meet, so our time together goes to the decisions that matter.\n\nRishari's strategists lead this work. We read what you share, follow up on anything unclear, and make the strategic recommendations. The tools in this experience help us organize information and make sure nothing important is missed. They support our judgment. They don't replace it." },
+    { heading: 'What we collect', body: "The answers you type, including anything you mark as unsure or want to discuss.\n\nThe products and services, customer companies, and personas you describe.\n\nDocuments you choose to upload. Uploads are optional.\n\nYour name, email address, and sign-in details.\n\nBasic records of activity, such as when answers were saved or submitted, so we can keep your work safe and know which version you confirmed.\n\nPlease don't include passwords, patient information, or sensitive personal information." },
+    { heading: 'Why we collect it', body: "To understand your business before our conversation.\n\nTo develop positioning and messaging recommendations for you.\n\nTo keep a record of what you confirmed, so the final work is based on what you told us.\n\nTo keep your account and project secure." },
+    { heading: 'How Rishari uses AI-assisted tools', body: "We use AI-assisted tools in specific, limited ways: to organize your answers, point out gaps or unclear connections, and prepare first drafts of working materials. This helps us move faster and get every important detail right.\n\nA Rishari strategist reviews everything these tools produce, decides what is accurate and useful, and approves every deliverable. You will not receive strategy that a person at Rishari has not reviewed. We don't use these tools to make decisions about you, and your information is sent to an AI provider only to do the work for your project.\n\nTo be completed by Rishari: confirm the data-handling terms of the AI provider before AI features are turned on." },
+    { heading: 'Who can see your information', body: "You and the Rishari team members working on your project. Other clients can't see your information, and you can't see theirs. Notes our team writes during review are kept for internal use." },
+    { heading: 'Service providers', body: "We use a small number of providers to run this experience. Each handles information only to deliver its part of the service.\n\nRender hosts the application and its database.\n\nClerk handles sign-in.\n\nOpenAI provides the AI-assisted tools described above.\n\nTo be completed by Rishari: name the file storage provider for uploaded documents." },
+    { heading: 'How long we keep it and how to delete it', body: "You can ask us to delete your project information at any time. Some information may remain in backups for a limited period before it is removed.\n\nTo be completed by Rishari: how long project information is kept after an engagement ends." },
+    { heading: 'Contact', body: 'To be completed by Rishari: the email address for questions about your information.' },
   ],
 };

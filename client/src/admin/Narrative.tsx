@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api';
+import type { Summary } from '../api';
+import { SummaryCard } from '../client/Connections';
 import { EVIDENCE_OPTIONS } from '@shared/narrative';
 
 type Field = { key: string; label: string; important: boolean; optional: boolean; status: string; reason: string; overridden: boolean; questionKey: string | null; prompt: string | null; value: unknown; evidenceStatus: string | null };
-type Section = { key: string; title: string; offer: boolean; scopes: { offer: { id: string; name: string; availability: string | null } | null; fields: Field[] }[] };
-type Clar = { id: string; question_key: string; offer_id: string | null; note: string | null; status: string; created_at: string };
+type Scope = { offer: { id: string; name: string; availability: string | null } | null; persona: { id: string; name: string } | null; fields: Field[] };
+type Section = { key: string; title: string; scope: 'company' | 'persona' | 'offer'; scopes: Scope[] };
+const scopeKey = (sc: Scope) => sc.persona?.id ?? sc.offer?.id ?? 'company';
+const ScopeLabel = ({ sc }: { sc: Scope }) => (sc.persona ? <p className="eyebrow" style={{ marginBottom: '0.4rem' }}>Persona: {sc.persona.name}</p> : sc.offer ? <p className="eyebrow" style={{ marginBottom: '0.4rem' }}>{sc.offer.name}{sc.offer.availability === 'planned' ? ' (planned)' : ''}</p> : null);
+type Clar = { id: string; question_key: string; offer_id: string | null; persona_id: string | null; note: string | null; status: string; created_at: string };
 
 const STATUS: Record<string, string> = {
   not_asked: 'Not asked', captured: 'Captured', needs_clarification: 'Needs clarification', hypothesis: 'Hypothesis to test', not_applicable: 'Not applicable',
@@ -27,7 +32,7 @@ export function NarrativeTab() {
   const open = data.clarifications.filter((c) => c.status === 'open');
   return (
     <>
-      <p className="muted small">What the discovery has captured for each part of the buyer narrative. Missing customer proof is not an error. Ask the client only for what you need; nothing is sent until you share the link yourself.</p>
+      <p className="muted small">What the discovery has captured for the customer company, each priority persona, and each focus offer. Missing customer proof is not an error. Ask the client only for what you need; nothing is sent until you share the link yourself.</p>
       {msg && <p className="ok" role="status">{msg}</p>}
       {open.length > 0 && (
         <section className="card">
@@ -41,9 +46,10 @@ export function NarrativeTab() {
       {data.coverage.map((sec) => (
         <section key={sec.key} className="card">
           <h2 style={{ marginTop: 0 }}>{sec.title}</h2>
+          {sec.scopes.length === 0 && <p className="muted small">No priority personas yet.</p>}
           {sec.scopes.map((sc) => (
-            <div key={sc.offer?.id ?? 'company'} style={{ marginBottom: '1rem' }}>
-              {sec.offer && sc.offer && <p className="eyebrow" style={{ marginBottom: '0.4rem' }}>{sc.offer.name}{sc.offer.availability === 'planned' ? ' (planned)' : ''}</p>}
+            <div key={scopeKey(sc)} style={{ marginBottom: '1rem' }}>
+              <ScopeLabel sc={sc} />
               <table>
                 <thead><tr><th style={{ width: '24%' }}>Element</th><th style={{ width: '18%' }}>Status</th><th>What we have</th><th style={{ width: '22%' }}>Action</th></tr></thead>
                 <tbody>{sc.fields.map((f) => (
@@ -52,16 +58,16 @@ export function NarrativeTab() {
                     <td><strong>{STATUS[f.status]}</strong><div className="small muted">{f.reason}</div></td>
                     <td className="small">{excerpt(f.value) || <span className="muted">Nothing yet.</span>}{f.evidenceStatus && <div><span className="tag">{evidence(f.evidenceStatus)}</span></div>}</td>
                     <td>
-                      <label className="sr-only" htmlFor={`ov-${f.key}-${sc.offer?.id}`}>Set status for {f.label}</label>
-                      <select id={`ov-${f.key}-${sc.offer?.id}`} value={f.overridden ? f.status : ''} style={{ fontSize: '0.85rem', padding: '0.35rem' }} onChange={async (e) => {
-                        await api(`/api/admin/projects/${pid}/coverage`, { method: 'PUT', json: { fieldKey: f.key, offerId: sc.offer?.id ?? null, status: e.target.value || null } }); load();
+                      <label className="sr-only" htmlFor={`ov-${f.key}-${scopeKey(sc)}`}>Set status for {f.label}</label>
+                      <select id={`ov-${f.key}-${scopeKey(sc)}`} value={f.overridden ? f.status : ''} style={{ fontSize: '0.85rem', padding: '0.35rem' }} onChange={async (e) => {
+                        await api(`/api/admin/projects/${pid}/coverage`, { method: 'PUT', json: { fieldKey: f.key, offerId: sc.offer?.id ?? null, personaId: sc.persona?.id ?? null, status: e.target.value || null } }); load();
                       }}>
                         <option value="">Automatic</option>
                         {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                       </select>
                       {f.questionKey && f.status !== 'captured' && f.status !== 'not_applicable' && (
                         <button className="link small" style={{ display: 'block', marginTop: '0.4rem' }} onClick={async () => {
-                          await api(`/api/admin/projects/${pid}/clarifications`, { method: 'POST', json: { questionKey: f.questionKey, offerId: sc.offer?.id ?? null } });
+                          await api(`/api/admin/projects/${pid}/clarifications`, { method: 'POST', json: { questionKey: f.questionKey, offerId: sc.offer?.id ?? null, personaId: sc.persona?.id ?? null } });
                           setMsg(`Added "${f.label}" to the client's requests.`); load();
                         }}>Ask the client</button>
                       )}
@@ -79,7 +85,7 @@ export function NarrativeTab() {
 
 type Flag = {
   id: string; issue: string; priority: string; source_refs: { questionKey: string; offerId: string | null; prompt: string }[]; noticed: string; suggested_action: string;
-  example: string | null; why: string | null; client_question: string | null; decision: string | null; reviewer_note: string | null; offer_name: string | null; check_key: string | null;
+  example: string | null; why: string | null; client_question: string | null; decision: string | null; reviewer_note: string | null; offer_name: string | null; persona_name: string | null; check_key: string | null;
 };
 const DECISIONS: [string, string][] = [['accepted', 'Accept'], ['agenda', 'Add to agenda'], ['clarification_requested', 'Request clarification'], ['assumption', 'Mark as assumption'], ['resolved', 'Resolve'], ['dismissed', 'Dismiss']];
 
@@ -92,12 +98,12 @@ export function FlagsTab() {
   if (!flags) return <p className="muted">Loading...</p>;
   return (
     <>
-      <p className="muted small">Run the checks after the client submits, or any time you want a fresh look. These checks follow fixed rules and use no AI. Checks that need judgment, like spotting success described only as features, arrive with the AI features.</p>
+      <p className="muted small">Run the checks after the client submits, or any time you want a fresh look. These checks follow fixed rules and use no AI. They point to answers worth a closer look; a strategist decides what each one means.</p>
       <p><button onClick={async () => { const r = await api<{ found: number; created: number }>(`/api/admin/projects/${pid}/checks`, { method: 'POST' }); setMsg(`Checks found ${r.found} item${r.found === 1 ? '' : 's'}; ${r.created} new.`); load(); }}>Run checks</button> <span role="status" className="small">{msg}</span></p>
       {flags.length === 0 && <p className="muted">No flags yet.</p>}
       {flags.map((f) => (
         <article key={f.id} className="card" style={f.decision === 'dismissed' || f.decision === 'resolved' ? { opacity: 0.6 } : undefined}>
-          <p className="eyebrow" style={{ marginBottom: '0.3rem' }}>{f.priority} priority{f.offer_name ? ` · ${f.offer_name}` : ''}</p>
+          <p className="eyebrow" style={{ marginBottom: '0.3rem' }}>{f.priority} priority{f.persona_name ? ` · Persona: ${f.persona_name}` : ''}{f.offer_name ? ` · ${f.offer_name}` : ''}</p>
           <h2 style={{ marginTop: 0 }}>{f.issue}{f.decision && <span className="tag">{DECISIONS.find((d) => d[0] === f.decision)?.[1] ?? f.decision}</span>}</h2>
           <p><strong>What we noticed.</strong> {f.noticed}</p>
           <p><strong>Suggested action.</strong> {f.suggested_action}</p>
@@ -123,7 +129,8 @@ export function FlagsTab() {
 type Basis = {
   snapshot: { id: string; version: number; createdAt: string };
   coverage: Section[];
-  assumptions: { id: string; kind: string; text: string; offerName: string | null }[];
+  connections: Summary[];
+  assumptions: { id: string; kind: string; text: string; scopeName: string | null }[];
 };
 type Approval = { id: string; target_version: string; stale: boolean; created_at: string; actor_email: string; accepted_assumptions: { id: string; text: string }[] };
 
@@ -145,12 +152,17 @@ export function SourceApprovalTab() {
     <>
       <p className="muted small">Approving confirms that submitted version {basis.snapshot.version} is the source for strategy work. Drafts will use exactly this version. A newer submission makes this approval stale.</p>
       {current && <p className="ok">Version {basis.snapshot.version} was approved by {current.actor_email} on {new Date(current.created_at).toLocaleString()}.</p>}
+      <h2>How it connects</h2>
+      <p className="muted small">The same summaries the client checked. Missing and uncertain connections are listed first under open assumptions.</p>
+      {basis.connections.map((s) => <SummaryCard key={s.personaId ?? 'company'} s={s} projectId={pid!} />)}
+      <SourceBrief pid={pid!} />
+      <h2>Coverage</h2>
       {basis.coverage.map((sec) => (
         <section key={sec.key} className="card">
           <h2 style={{ marginTop: 0 }}>{sec.title}</h2>
           {sec.scopes.map((sc) => (
-            <div key={sc.offer?.id ?? 'company'}>
-              {sec.offer && sc.offer && <p className="eyebrow" style={{ marginBottom: '0.3rem' }}>{sc.offer.name}</p>}
+            <div key={scopeKey(sc)}>
+              <ScopeLabel sc={sc} />
               {sc.fields.map((f) => (
                 <div className="answer-block" key={f.key}>
                   <p className="q">{f.label} <span className="tag">{STATUS[f.status]}</span>{f.evidenceStatus && <span className="tag">{evidence(f.evidenceStatus)}</span>}</p>
@@ -169,7 +181,7 @@ export function SourceApprovalTab() {
             {basis.assumptions.map((a) => (
               <label key={a.id} className="choice" style={{ marginBottom: '0.6rem' }}>
                 <input type="checkbox" checked={accepted.has(a.id)} onChange={(e) => { const n = new Set(accepted); if (e.target.checked) n.add(a.id); else n.delete(a.id); setAccepted(n); }} />
-                <span>{a.offerName ? <strong>{a.offerName}: </strong> : null}{a.text}</span>
+                <span>{a.scopeName ? <strong>{a.scopeName}: </strong> : null}{a.text}</span>
               </label>
             ))}
           </>
@@ -192,6 +204,40 @@ export function SourceApprovalTab() {
           </table>
         </section>
       )}
+    </>
+  );
+}
+
+// The connected source brief: what strategy work will use. Built by fixed rules from the approved version; blanks stay blank.
+function SourceBrief({ pid }: { pid: string }) {
+  const [b, setB] = useState<{ version: number; approved: boolean; markdown: string } | null>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => { api<{ version: number; approved: boolean; markdown: string }>(`/api/admin/projects/${pid}/source-brief`).then(setB).catch(() => setB(null)); }, [pid]);
+  if (!b) return null;
+  return (
+    <section className="card">
+      <h2 style={{ marginTop: 0 }}>Connected source brief</h2>
+      <p className="small muted">Version {b.version}{b.approved ? ', approved' : ', not approved yet'}. This is the material strategy drafts will start from.</p>
+      <button className="secondary" onClick={() => setOpen(!open)}>{open ? 'Hide brief' : 'Show brief'}</button>{' '}
+      <button className="secondary" onClick={() => {
+        const url = URL.createObjectURL(new Blob([b.markdown], { type: 'text/markdown' }));
+        const el = document.createElement('a'); el.href = url; el.download = `source-brief-v${b.version}.md`; el.click(); URL.revokeObjectURL(url);
+      }}>Download</button>
+      {open && <pre className="brief">{b.markdown}</pre>}
+    </section>
+  );
+}
+
+// Section 9 in admin: the same connected summaries the client sees, read-only, with their corrections.
+export function ConnectionsTab() {
+  const { pid } = useParams();
+  const [s, setS] = useState<Summary[] | null>(null);
+  useEffect(() => { api<Summary[]>(`/api/projects/${pid}/connections`).then(setS); }, [pid]);
+  if (!s) return <p className="muted">Loading...</p>;
+  return (
+    <>
+      <p className="muted small">One summary for the customer company and one for each priority persona. Client corrections and discussion marks appear at the bottom of each.</p>
+      {s.map((x) => <SummaryCard key={x.personaId ?? 'company'} s={x} projectId={pid!} />)}
     </>
   );
 }

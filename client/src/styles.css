@@ -593,3 +593,17 @@ p, li, .hero-sub, .lede, .small, .muted, td, dd { text-wrap: pretty; }
   table.stack td { row-gap: 0.2rem; column-gap: 0.75rem; grid-auto-rows: min-content; }
   table.stack td::before { grid-row: 1 / span 3; }
 }
+
+/* Eyebrows and labels in sentence case (status badges stay in caps) */
+.eyebrow, .progress-text, .black-card .label, th, .demo-bar .label, .flow-label, .side-label, .tile-label,
+.review-label, .rail-sub, .rail-label, .rail-group-label, .crumb-tag, .hero-eyebrow, .drawer-progress span:first-child {
+  text-transform: none; letter-spacing: 0.01em;
+}
+.eyebrow, .hero-eyebrow, .progress-text, .black-card .label { font-size: 0.85rem; }
+th, .flow-label, .tile-label, .side-label, .review-label, .crumb-tag { font-size: 0.8rem; }
+.rail-sub { font-size: 0.78rem; letter-spacing: 0.02em; }
+.rail-label, .rail-group-label { font-size: 0.74rem; }
+.drawer-progress span:first-child { font-size: 0.78rem; }
+@media (max-width: 760px) {
+  table.stack td::before { text-transform: none; letter-spacing: 0.01em; font-size: 0.78rem; }
+}

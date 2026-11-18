@@ -268,7 +268,7 @@ export function GuidanceEditor() {
           try { await api(`/api/admin/guidance/${g.key}`, { method: 'PUT', json: { issue: g.issue, action: g.action, example: g.example, why: g.why, clientQuestion: g.client_question } }); setMsg({ ...msg, [g.key]: 'Saved.' }); }
           catch (x) { setMsg({ ...msg, [g.key]: (x as Error).message }); }
         }}>
-          <p className="eyebrow">{g.key.replaceAll('_', ' ')}</p>
+          <p className="eyebrow">{(k => k.charAt(0).toUpperCase() + k.slice(1))(g.key.replaceAll('_', ' '))}</p>
           {(['issue', 'action', 'example', 'why', 'client_question'] as const).map((k) => (
             <div className="field" key={k}>
               <label htmlFor={`g-${g.key}-${k}`}>{{ issue: 'Issue', action: 'Suggested action', example: 'Example', why: 'Why it matters', client_question: 'Suggested client question' }[k]}</label>

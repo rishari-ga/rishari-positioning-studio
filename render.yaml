@@ -40,9 +40,9 @@ services:
       - key: AI_ENABLED
         value: "true"
       - key: INTAKE_MODEL
-        value: gpt-5.4-mini
+        value: gpt-6-sol
       - key: STRATEGY_MODEL
-        value: gpt-5.4
+        value: gpt-6-sol
       - key: AI_PROJECT_MONTHLY_CAP_USD
         value: "15"
       - key: AI_TOTAL_MONTHLY_CAP_USD

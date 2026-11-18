@@ -10,7 +10,7 @@ import { ChapterSummary } from './Followups';
 import { Hero } from './Hero';
 import type { Persona } from '../api';
 import { useDiscovery } from './ProjectRoutes';
-import { ChapterMap, SaveIndicator, stepIndexFor, ClarificationBanner } from './ModulePage';
+import { ChapterMap, ProgressStrip, SaveIndicator, stepIndexFor, ClarificationBanner } from './ModulePage';
 import type { SaveStatus } from './useAutosave';
 
 const STATUS_LABEL: Record<string, string> = { not_sure: 'Not sure yet', discuss: 'Discuss with Rishari', not_applicable: 'Not applicable' };
@@ -38,7 +38,8 @@ export function ReviewPage() {
     <Hero eyebrow="Check and submit" line1={CONFIRMATION.heading} line2="Then send it to Rishari.">
       <p>Here's everything you shared, in your own words. Fix anything that's off. Mark any chapter you'd like to talk through.</p>
     </Hero>
-    <div className="layout">
+    <div className="mobile-strip"><ProgressStrip current="review" title="Check and submit" /></div>
+    <div className="layout has-strip">
       <aside><ChapterMap current="review" /></aside>
       <main id="main">
         <ClarificationBanner />

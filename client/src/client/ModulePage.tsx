@@ -264,7 +264,7 @@ function useOverallProgress() {
 }
 
 // A slim strip above the question: where you are, how far along, and the full chapter list in a drawer.
-function ProgressStrip({ current, chapter, title }: { current: string; chapter: number; title: string }) {
+export function ProgressStrip({ current, chapter, title }: { current: string; chapter?: number; title: string }) {
   const { d } = useDiscovery();
   const p = useOverallProgress();
   const [open, setOpen] = useState(false);
@@ -284,7 +284,7 @@ function ProgressStrip({ current, chapter, title }: { current: string; chapter: 
         <button ref={btn} type="button" className="chapters-toggle" aria-expanded={open} aria-controls="chapter-drawer" onClick={() => setOpen(true)}>
           <span className="burger" aria-hidden="true" />Chapters
         </button>
-        <span className="strip-where"><strong><span className="strip-long">Chapter </span>{chapter} of {d.modules.length}</strong><span className="strip-title"> &middot; {title}</span></span>
+        <span className="strip-where">{chapter ? <><strong><span className="strip-long">Chapter </span>{chapter} of {d.modules.length}</strong><span className="strip-title"> &middot; {title}</span></> : <strong>{title}</strong>}</span>
         <span className="strip-left">{p.label}</span>
       </div>
       <div className="progress-bar" role="progressbar" aria-label="Discovery progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.pct}><span style={{ width: `${p.pct}%` }} /></div>

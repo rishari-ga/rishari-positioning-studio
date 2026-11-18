@@ -531,3 +531,65 @@ main.done .hero-inner { padding-top: 6rem; }
 .cm-title { flex: 1; }
 .cm-num { font-size: 0.66rem; color: var(--caption); font-variant-numeric: tabular-nums; }
 .drawer.dark .cm-num { color: rgba(255,255,255,0.42); }
+
+/* No orphans: headings balance their lines, body text avoids a lone last word */
+h1, h2, h3, h4, .hero-title, .hero-title span, .admin-title, .tile-label, .hs-text, legend, label { text-wrap: balance; }
+p, li, .hero-sub, .lede, .small, .muted, td, dd { text-wrap: pretty; }
+
+/* ---------- Mobile pass ---------- */
+.nw { white-space: nowrap; }
+.mobile-strip { display: none; }
+@media (max-width: 760px) {
+  /* Check screens: the Chapters button replaces the side list */
+  .mobile-strip { display: block; padding: 1rem 1.25rem 0; }
+  .layout.has-strip > aside { display: none; }
+  .layout.has-strip { padding-top: 1.25rem; }
+
+  /* Tables that matter become stacked cards */
+  table.stack, table.stack tbody, table.stack tr, table.stack td { display: block; width: 100%; }
+  table.stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.stack tr { border: 1px solid var(--hairline); border-radius: var(--radius-md); padding: 0.85rem 1rem; margin-bottom: 0.75rem; background: var(--white); }
+  table.stack td { border: 0; padding: 0.3rem 0; display: grid; grid-template-columns: 7.5rem 1fr; gap: 0.75rem; align-items: start; }
+  table.stack td::before { content: attr(data-label); font-size: 0.66rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--caption); padding-top: 0.2rem; }
+  table.stack td:first-child, table.stack td.stack-head { grid-template-columns: 1fr; font-weight: 600; padding-bottom: 0.5rem; margin-bottom: 0.25rem; border-bottom: 1px solid var(--hairline); }
+  table.stack td:first-child::before, table.stack td.stack-head::before { display: none; }
+  table.stack td > select { width: 100%; }
+  table.stack .meter { max-width: 12rem; }
+
+  /* Any other table scrolls sideways inside its card instead of pushing the page */
+  table:not(.stack) { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table:not(.stack) th, table:not(.stack) td { white-space: nowrap; }
+
+  /* Dashboard tiles: two up, the last one spans */
+  .tiles { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .tiles .tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .tile { padding: 1rem; }
+
+  /* Stage tracker reads top to bottom */
+  ol.stages { display: flex; flex-direction: column; gap: 0; }
+  ol.stages li { display: grid; grid-template-columns: 1rem 1fr auto; column-gap: 0.75rem; align-items: center; padding: 0.45rem 0; }
+  ol.stages li::before, ol.stages li::after { display: none !important; }
+  ol.stages .stage-name { margin: 0; }
+  ol.stages .stage-date { margin: 0; text-align: right; }
+
+  /* Comfortable tap targets */
+  button, .button, input[type=text], input[type=email], input[type=url], select, textarea { min-height: 44px; }
+  .chapters-toggle, .drawer-close, .rail-signout { min-height: 40px; }
+  form.new-project button[type=submit] { width: 100%; }
+  .crumbbar { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .crumbbar .tag, .crumbbar .internal { display: none; }
+}
+@media (max-width: 760px) {
+  table.stack td > * { grid-column: 2; justify-self: start; }
+  table.stack td::before { grid-column: 1; grid-row: 1 / span 6; }
+  table.stack td:first-child, table.stack td.stack-head { display: block; }
+  table.stack td:first-child > *, table.stack td.stack-head > * { display: inline-block; vertical-align: middle; margin-left: 0.4rem; }
+  table.stack td:first-child > a:first-child { margin-left: 0; }
+  table.stack td > select { justify-self: stretch; }
+  .mobile-strip .strip-left { display: none; }
+  form.new-project button[type=submit] { white-space: nowrap; }
+}
+@media (max-width: 760px) {
+  table.stack td { row-gap: 0.2rem; column-gap: 0.75rem; grid-auto-rows: min-content; }
+  table.stack td::before { grid-row: 1 / span 3; }
+}

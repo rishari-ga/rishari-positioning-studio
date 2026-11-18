@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api';
 import type { Summary } from '../api';
 import { useDiscovery } from './ProjectRoutes';
-import { ChapterMap, SaveIndicator } from './ModulePage';
+import { ChapterMap, ProgressStrip, SaveIndicator } from './ModulePage';
 import type { SaveStatus } from './useAutosave';
 import { Hero } from './Hero';
 
@@ -20,7 +20,8 @@ export function ConnectionsPage() {
     <Hero eyebrow="Check the connection" line1="Every answer connects." line2="Check the chain.">
       <p>Each summary links a goal and a problem to what you offer and the result you expect. Dashed boxes are gaps. Fill them in, leave them open, or mark them to talk through with Rishari.</p>
     </Hero>
-    <div className="layout">
+    <div className="mobile-strip"><ProgressStrip current="connections" title="Check the connection" /></div>
+    <div className="layout has-strip">
       <aside><ChapterMap current="connections" /></aside>
       <main id="main">
         {err && <p className="notice" role="alert">{err}</p>}

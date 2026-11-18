@@ -50,14 +50,14 @@ export function NarrativeTab() {
           {sec.scopes.map((sc) => (
             <div key={scopeKey(sc)} style={{ marginBottom: '1rem' }}>
               <ScopeLabel sc={sc} />
-              <table>
+              <table className="stack">
                 <thead><tr><th style={{ width: '24%' }}>Element</th><th style={{ width: '18%' }}>Status</th><th>What we have</th><th style={{ width: '22%' }}>Action</th></tr></thead>
                 <tbody>{sc.fields.map((f) => (
                   <tr key={f.key}>
-                    <td>{f.label}{f.important && <span className="tag">Key</span>}{f.optional && <span className="tag">Optional</span>}</td>
-                    <td><strong>{STATUS[f.status]}</strong><div className="small muted">{f.reason}</div></td>
-                    <td className="small">{excerpt(f.value) || <span className="muted">Nothing yet.</span>}{f.evidenceStatus && <div><span className="tag">{evidence(f.evidenceStatus)}</span></div>}</td>
-                    <td>
+                    <td data-label="Element" className="stack-head">{f.label}{f.important && <span className="tag">Key</span>}{f.optional && <span className="tag">Optional</span>}</td>
+                    <td data-label="Status"><strong>{STATUS[f.status]}</strong><div className="small muted">{f.reason}</div></td>
+                    <td data-label="What we have" className="small">{excerpt(f.value) || <span className="muted">Nothing yet.</span>}{f.evidenceStatus && <div><span className="tag">{evidence(f.evidenceStatus)}</span></div>}</td>
+                    <td data-label="Action">
                       <label className="sr-only" htmlFor={`ov-${f.key}-${scopeKey(sc)}`}>Set status for {f.label}</label>
                       <select id={`ov-${f.key}-${scopeKey(sc)}`} value={f.overridden ? f.status : ''} style={{ fontSize: '0.85rem', padding: '0.35rem' }} onChange={async (e) => {
                         await api(`/api/admin/projects/${pid}/coverage`, { method: 'PUT', json: { fieldKey: f.key, offerId: sc.offer?.id ?? null, personaId: sc.persona?.id ?? null, status: e.target.value || null } }); load();

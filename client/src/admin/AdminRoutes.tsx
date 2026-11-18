@@ -56,16 +56,16 @@ function ProjectList() {
       <h1 className="admin-title">Every client. Every stage.</h1>
       <p className="muted">Where each project stands, who's active, and what needs you next.</p>
       {!rows ? <p className="muted">Loading...</p> : rows.length === 0 ? <p className="muted">No projects yet. Start one below.</p> : (
-        <table>
+        <table className="stack">
           <thead><tr><th>Project</th><th>Stage</th><th>Discovery</th><th>Open flags</th><th>Last active</th><th>Client</th></tr></thead>
           <tbody>{rows.map((r) => (
             <tr key={r.id}>
-              <td><Link className="row-title" to={`/admin/p/${r.id}`}>{r.company_name || r.name}</Link> {r.is_fictional && <span className="fictional">Fictional</span>}</td>
-              <td><span className="pill">{r.stage}</span></td>
-              <td><Meter value={r.core_total ? Math.round((r.core_answered / r.core_total) * 100) : 0} /></td>
-              <td>{r.open_flags ? <span className="count">{r.open_flags}</span> : <span className="muted">0</span>}</td>
-              <td><LastActive at={r.last_active_at} /></td>
-              <td className="small">{r.client_email ?? <span className="muted">Not invited</span>}</td>
+              <td data-label="Project"><Link className="row-title" to={`/admin/p/${r.id}`}>{r.company_name || r.name}</Link> {r.is_fictional && <span className="fictional">Fictional</span>}</td>
+              <td data-label="Stage"><span className="pill">{r.stage}</span></td>
+              <td data-label="Discovery"><Meter value={r.core_total ? Math.round((r.core_answered / r.core_total) * 100) : 0} /></td>
+              <td data-label="Open flags">{r.open_flags ? <span className="count">{r.open_flags}</span> : <span className="muted">0</span>}</td>
+              <td data-label="Last active"><LastActive at={r.last_active_at} /></td>
+              <td data-label="Client" className="small">{r.client_email ?? <span className="muted">Not invited</span>}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -183,11 +183,11 @@ function Dashboard({ pid }: { pid: string }) {
   return (
     <>
       <div className="tiles">
-        <div className="tile"><span className="tile-label">Answered</span><span className="tile-num">{d.completion.pct}%</span><Bar value={d.completion.pct} /><span className="tile-sub">{d.completion.answered} of {d.completion.total} core questions</span></div>
+        <div className="tile"><span className="tile-label">Answered</span><span className="tile-num">{d.completion.pct}%</span><Bar value={d.completion.pct} /><span className="tile-sub">{d.completion.answered} of {d.completion.total} <span className="nw">core questions</span></span></div>
         <div className="tile"><span className="tile-label">Coverage</span><span className="tile-num">{d.coverage.pct}%</span><Bar value={d.coverage.pct} /><span className="tile-sub">{d.coverage.captured} of {d.coverage.total} key fields</span></div>
-        <div className="tile"><span className="tile-label">Open flags</span><span className="tile-num">{openFlags}</span><span className="tile-sub">{d.flags.high} high &middot; {d.flags.medium} medium &middot; {d.flags.low} low</span></div>
+        <div className="tile"><span className="tile-label">Open flags</span><span className="tile-num">{openFlags}</span><span className="tile-sub"><span className="nw">{d.flags.high} high</span> &middot; <span className="nw">{d.flags.medium} medium</span> &middot; <span className="nw">{d.flags.low} low</span></span></div>
         <div className="tile"><span className="tile-label">Client activity</span><span className="tile-num small-num"><LastActive at={d.lastActive} /></span></div>
-        <div className="tile"><span className="tile-label">AI spend</span><span className="tile-num">${(d.ai.cents / 100).toFixed(2)}</span><span className="tile-sub">this month, of ${(d.ai.capCents / 100).toFixed(0)} cap</span></div>
+        <div className="tile"><span className="tile-label">AI spend</span><span className="tile-num">${(d.ai.cents / 100).toFixed(2)}</span><span className="tile-sub">this month, <span className="nw">of ${(d.ai.capCents / 100).toFixed(0)} cap</span></span></div>
       </div>
       <section className="card stage-card">
         <ol className="stages">

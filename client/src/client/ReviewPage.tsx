@@ -6,11 +6,11 @@ import { findAnswer } from '../api';
 import type { Answer, Question, Discovery, Module, FocusOffer } from '../api';
 import { renderPrompt, EVIDENCE_OPTIONS, PURCHASE_ROLES, FIT_OPTIONS } from '@shared/narrative';
 import { priorityPersonas } from '../api';
-import { ChapterSummary } from './Followups';
+import { returnToReview } from './returnToReview';
 import { Hero } from './Hero';
 import type { Persona } from '../api';
 import { useDiscovery } from './ProjectRoutes';
-import { ChapterMap, ProgressStrip, SaveIndicator, stepIndexFor, ClarificationBanner } from './ModulePage';
+import { ChapterMap, ProgressStrip, SaveIndicator, stepIndexFor, ClarificationBanner, moduleCounts } from './ModulePage';
 import type { SaveStatus } from './useAutosave';
 
 const STATUS_LABEL: Record<string, string> = { not_sure: 'Not sure yet', discuss: 'Discuss with Rishari', not_applicable: 'Not applicable' };
@@ -31,7 +31,12 @@ export function ReviewPage() {
   const [err, setErr] = useState('');
   // One key per visit to this page, so a retried submit cannot create a duplicate snapshot.
   const idemKey = useMemo(() => crypto.randomUUID(), []);
-  useEffect(() => { document.getElementById('hero-h')?.focus(); }, []);
+  useEffect(() => { document.getElementById('hero-h')?.focus(); returnToReview.clear(); }, []);
+  const counts = d.modules.map((m) => moduleCounts(d, m));
+  const totalDone = counts.reduce((n, c) => n + c.done, 0);
+  const totalAll = counts.reduce((n, c) => n + c.total, 0);
+  const marked = d.progress.filter((p) => p.marked_for_discussion).length;
+  const toSubmit = () => { const el = document.getElementById('submit'); el?.scrollIntoView({ behavior: 'smooth', block: 'start' }); (document.getElementById('confirm') as HTMLInputElement | null)?.focus({ preventScroll: true }); };
 
   return (
     <>
@@ -45,25 +50,46 @@ export function ReviewPage() {
         <ClarificationBanner />
         {d.submissions.length > 0 && <p className="ok">You submitted version {d.submissions[0].version} on {new Date(d.submissions[0].created_at).toLocaleDateString()}. Submitting again creates a new version. The earlier one is kept.</p>}
 
-        {d.modules.map((m) => {
+        <div className="rv-overview card">
+          <div className="rv-stats">
+            <div><span className="rv-num">{totalDone}<span className="rv-of"> of {totalAll}</span></span><span className="rv-label">Questions answered</span></div>
+            <div><span className="rv-num">{marked}</span><span className="rv-label">Chapters to talk through</span></div>
+          </div>
+          <p className="small" style={{ margin: 0 }}>Open any chapter below to read or change your answers. Unanswered questions are fine. We'll cover them on our call.</p>
+          <button type="button" className="secondary" onClick={toSubmit}>Go to submit</button>
+        </div>
+
+        <div className="rv-list">
+        {d.modules.map((m, i) => {
           const prog = d.progress.find((p) => p.module_id === m.id);
+          const c = counts[i];
           return (
-            <section key={m.id} className="card" aria-labelledby={`rv-${m.key}`}>
-              <h2 id={`rv-${m.key}`}>{m.title}</h2>
-              <ChapterSummary pid={d.project.id} moduleKey={m.key} />
-              <ModuleAnswers d={d} m={m} linkBase={`/p/${d.project.id}`} />
-              <ModuleControls moduleKey={m.key} marked={prog?.marked_for_discussion ?? false} correction={prog?.client_correction ?? ''} onChange={reload} />
-            </section>
+            <details key={m.id} className="rv-chapter">
+              <summary>
+                <span className="rv-n" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                <span className="rv-title">{m.title}</span>
+                {prog?.marked_for_discussion && <span className="tag">To discuss</span>}
+                <span className={`rv-count ${c.total && c.done === c.total ? 'all' : ''}`}>{c.done} of {c.total}</span>
+                <span className="rv-chev" aria-hidden="true" />
+              </summary>
+              <div className="rv-body">
+                <ModuleAnswers d={d} m={m} linkBase={`/p/${d.project.id}`} />
+                <ModuleControls moduleKey={m.key} marked={prog?.marked_for_discussion ?? false} correction={prog?.client_correction ?? ''} onChange={reload} />
+              </div>
+            </details>
           );
         })}
+        </div>
 
-        <form onSubmit={async (e) => {
+        <form id="submit" className="rv-submit" onSubmit={async (e) => {
           e.preventDefault(); setBusy(true); setErr('');
           try {
             await api(`/api/projects/${d.project.id}/submit`, { method: 'POST', json: { confirmed: true, idempotencyKey: idemKey } });
             await reload(); nav(`/p/${d.project.id}/done`);
           } catch (x) { setErr((x as Error).message); setBusy(false); }
         }}>
+          <h2>Ready to send?</h2>
+          <p className="small">You can still change answers after you submit. Submitting again saves a new version.</p>
           <div className="card" style={{ background: 'var(--grey)', border: 0, borderRadius: 'var(--radius-md)' }}>
             <label className="choice" htmlFor="confirm">
               <input id="confirm" type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
@@ -71,7 +97,7 @@ export function ReviewPage() {
             </label>
           </div>
           {err && <p className="notice" role="alert">{err}</p>}
-          <button type="submit" disabled={!confirmed || busy}>{busy ? 'Submitting...' : 'Submit'}</button>
+          <button type="submit" disabled={!confirmed || busy}>{busy ? 'Submitting...' : 'Submit to Rishari'}</button>
         </form>
       </main>
     </div>
@@ -192,7 +218,7 @@ export function ModuleAnswers({ d, m, linkBase }: { d: Discovery; m: Module; lin
           {a?.reused_from_key && <span className="tag">From an earlier answer</span>}
         </p>
         {text ? <p className="a">{text}</p> : a?.status === 'not_applicable' ? null : <p className="muted">Not answered.</p>}
-        {at && <Link className="small" to={`${linkBase}/m/${at.moduleKey}/${at.index}`}>Return to this answer</Link>}
+        {at && <Link className="small" to={`${linkBase}/m/${at.moduleKey}/${at.index}`} onClick={() => returnToReview.start(d.project.id)}>Change this answer</Link>}
       </div>
     );
   };

@@ -2,14 +2,28 @@ export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
 }
 
+// Clerk's session token lasts about a minute and is refreshed in the background. A request can go out
+// just after it expires (a laptop waking up, a background tab), so we send a fresh token with every call
+// and, if the server still says "not signed in", refresh once and try again before reporting a failure.
+type ClerkLike = { session?: { getToken: (o?: { skipCache?: boolean }) => Promise<string | null> } | null };
+const clerk = () => (window as unknown as { Clerk?: ClerkLike }).Clerk;
+export async function authHeader(fresh = false): Promise<Record<string, string>> {
+  try {
+    const t = await clerk()?.session?.getToken(fresh ? { skipCache: true } : undefined);
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  } catch { return {}; }
+}
+
 export async function api<T = unknown>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, ...rest } = init;
-  const res = await fetch(path, {
+  const send = async (fresh: boolean) => fetch(path, {
     credentials: 'include',
     ...rest,
-    headers: json !== undefined ? { 'Content-Type': 'application/json', ...(rest.headers ?? {}) } : rest.headers,
+    headers: { ...(json !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(await authHeader(fresh)), ...((rest.headers as Record<string, string>) ?? {}) },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
+  let res = await send(false);
+  if (res.status === 401 && clerk()?.session) res = await send(true);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, data.error ?? 'error', data.message ?? 'Something went wrong.');
   return data as T;

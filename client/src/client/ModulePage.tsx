@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { api, hasContent, findAnswer, priorityPersonas } from '../api';
+import { api, authHeader, hasContent, findAnswer, priorityPersonas } from '../api';
 import type { Discovery, Module, Question, Offer, FocusOffer, Persona, CustomerGroup, SolutionLink } from '../api';
 import { EVIDENCE_LABELS } from '@shared/content';
 import { renderPrompt, fill, EVIDENCE_OPTIONS, PURCHASE_ROLES, FIT_OPTIONS, TERMS } from '@shared/narrative';
@@ -10,6 +10,8 @@ import { useAutosave } from './useAutosave';
 import type { Draft, SaveStatus } from './useAutosave';
 import { FollowupBox } from './Followups';
 import { DICTATION } from '@shared/content';
+import { saveTracker } from './saveTracker';
+import { returnToReview } from './returnToReview';
 import wordmarkWhite from '../assets/wordmark-white@2x.png';
 
 export type Step =
@@ -49,6 +51,19 @@ function stepDone(d: Discovery, s: Step): boolean {
   return hasContent(findAnswer(d, q.id, s.offer?.id ?? null, s.persona?.id ?? null));
 }
 
+// Counts questions, not screens: a screen of short fields (name, website...) counts each field.
+export function moduleCounts(d: Discovery, m: Module): { done: number; total: number } {
+  let done = 0, total = 0;
+  for (const s of stepsFor(d, m)) {
+    if (s.kind === 'question') { total += 1; if (stepDone(d, s)) done += 1; continue; }
+    if (s.kind === 'fields') for (const q of s.questions) {
+      total += 1;
+      const a = findAnswer(d, q.id, null, null);
+      if (a && a.status !== 'empty') done += 1;
+    }
+  }
+  return { done, total };
+}
 function moduleState(d: Discovery, m: Module): 'none' | 'partial' | 'done' {
   const steps = stepsFor(d, m).filter((s) => s.kind === 'question');
   if (!steps.length) return 'none';
@@ -189,7 +204,10 @@ export function ModulePage() {
   const mi = d.modules.findIndex((m) => m.key === moduleKey);
   const m = d.modules[mi];
   const headingRef = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { headingRef.current?.focus(); }, [moduleKey, step]);
+  const [leaving, setLeaving] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const fromReview = returnToReview.active(d.project.id);
+  useEffect(() => { headingRef.current?.focus(); setBlocked(false); }, [moduleKey, step]);
   if (!m) return <Navigate to={`/p/${d.project.id}`} replace />;
   const steps = stepsFor(d, m);
   if (!steps.length) return <Navigate to={`/p/${d.project.id}/m/${d.modules[Math.min(mi + 1, d.modules.length - 1)].key}/0`} replace />;
@@ -198,14 +216,23 @@ export function ModulePage() {
   const isLast = si === steps.length - 1;
   const needsPersonas = m.questions.some((q) => q.per_persona) && priorityPersonas(d).length === 0;
 
+  // Never leave a screen with an unsaved answer: save everything first, and stay put if a save fails.
+  const go = async (to: string) => {
+    setLeaving(true);
+    const ok = await saveTracker.settle();
+    setLeaving(false);
+    if (!ok) { setBlocked(true); return; }
+    setBlocked(false);
+    nav(to);
+  };
   const next = () => {
-    if (!isLast) nav(`/p/${d.project.id}/m/${m.key}/${si + 1}`);
-    else if (mi < d.modules.length - 1) nav(`/p/${d.project.id}/m/${d.modules[mi + 1].key}/0`);
-    else nav(`/p/${d.project.id}/connections`);
+    if (!isLast) void go(`/p/${d.project.id}/m/${m.key}/${si + 1}`);
+    else if (mi < d.modules.length - 1) void go(`/p/${d.project.id}/m/${d.modules[mi + 1].key}/0`);
+    else void go(`/p/${d.project.id}/connections`);
   };
   const back = () => {
-    if (si > 0) nav(`/p/${d.project.id}/m/${m.key}/${si - 1}`);
-    else if (mi > 0) { const pm = d.modules[mi - 1]; nav(`/p/${d.project.id}/m/${pm.key}/${Math.max(0, stepsFor(d, pm).length - 1)}`); }
+    if (si > 0) void go(`/p/${d.project.id}/m/${m.key}/${si - 1}`);
+    else if (mi > 0) { const pm = d.modules[mi - 1]; void go(`/p/${d.project.id}/m/${pm.key}/${Math.max(0, stepsFor(d, pm).length - 1)}`); }
   };
   const persona = s.kind === 'question' ? s.persona : null;
   const offer = s.kind === 'question' ? s.offer : null;
@@ -222,7 +249,7 @@ export function ModulePage() {
         {si === 0 && m.key === 'customer_company' && (
           <p className="skip-row"><Link className="button secondary" to={`/p/${d.project.id}/m/customer_personas/0`}>We sell to consumers. Skip this chapter.</Link></p>
         )}
-        {si === 0 && mi === 0 && <p className="dictate-tip"><strong>Tip:</strong> {DICTATION.short}</p>}
+        {si === 0 && mi === 0 && <p className="dictate-tip"><strong>Tip:</strong> {DICTATION.shortBefore} <a href={DICTATION.url} target="_blank" rel="noopener noreferrer">{DICTATION.app}<span className="sr-only"> (opens in a new tab)</span></a>{DICTATION.shortAfter}</p>}
         {m.key === 'customer_company' && si === 0 && <Definitions />}
         {['customer_personas', 'problems', 'solution', 'success', 'nothing_changes'].includes(m.key) && si === 0 && <Definitions compact />}
         {needsPersonas && si === 0 && (
@@ -246,10 +273,13 @@ export function ModulePage() {
 
         {isLast && <ModuleAttachments moduleKey={m.key} />}
 
+        {blocked && <p className="notice" role="alert">Your last answer didn't save, so we kept you on this screen. Check your connection, then press Continue again.</p>}
         <div className="nav-row sticky">
-          <button className="secondary" onClick={back} disabled={mi === 0 && si === 0}>Back</button>
-          <span className="small muted nav-hint">Your answers save as you type.</span>
-          <button onClick={next}>{isLast && mi === d.modules.length - 1 ? 'Check the connection' : 'Continue'}</button>
+          <button className="secondary" onClick={back} disabled={(mi === 0 && si === 0) || leaving}>Back</button>
+          {fromReview
+            ? <button className="secondary return-review" disabled={leaving} onClick={() => void go(`/p/${d.project.id}/review`)}>Back to check and submit</button>
+            : <span className="small muted nav-hint">{leaving ? 'Saving...' : 'Your answers save as you type.'}</span>}
+          <button onClick={next} disabled={leaving}>{isLast && mi === d.modules.length - 1 ? 'Check the connection' : 'Continue'}</button>
         </div>
       </main>
     </div>
@@ -812,7 +842,7 @@ function ModuleAttachments({ moduleKey }: { moduleKey: string }) {
         setStatus('saving'); setErr('');
         const fd = new FormData(); fd.append('file', file); fd.append('moduleKey', moduleKey);
         try {
-          const r = await fetch(`/api/projects/${d.project.id}/attachments`, { method: 'POST', body: fd, credentials: 'include' });
+          const r = await fetch(`/api/projects/${d.project.id}/attachments`, { method: 'POST', body: fd, credentials: 'include', headers: await authHeader() });
           const j = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(j.message ?? 'Upload failed.');
           setStatus('saved'); await reload();

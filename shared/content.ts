@@ -33,8 +33,13 @@ export const ACK = {
 // Rishari doesn't run voice features (cost). We point clients to free dictation tools instead.
 export const DICTATION = {
   heading: 'Talk instead of type',
-  body: "Many people find it faster to speak their answers. A free dictation app like Wispr Flow works in any text box. You can also use the microphone on your phone's keyboard, Dictation on a Mac, or Windows key + H on a PC. Speak naturally. You can tidy the words afterward, or leave them as they are.",
-  short: 'Speaking is often faster than typing. A free dictation app like Wispr Flow, or the microphone on your keyboard, works in every answer box.',
+  app: 'Wispr Flow',
+  url: 'https://wisprflow.ai/',
+  // Sentences around the app name, so the name can be a link.
+  bodyBefore: 'Many people find it faster to speak their answers. The free version of',
+  bodyAfter: "works in any text box. You can also use the microphone on your phone's keyboard, Dictation on a Mac, or Windows key + H on a PC. Speak naturally. You can tidy the words afterward, or leave them as they are.",
+  shortBefore: 'Speaking is often faster than typing. The free version of',
+  shortAfter: ", or the microphone on your keyboard, works in every answer box.",
 };
 
 export const CONFIRMATION = {

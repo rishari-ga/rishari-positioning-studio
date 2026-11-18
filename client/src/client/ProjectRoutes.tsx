@@ -1,3 +1,4 @@
+import { saveTracker, useSaveState } from './saveTracker';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { api } from '../api';
@@ -49,6 +50,7 @@ export function ProjectRoutes() {
 
   return (
     <DiscoveryCtx.Provider value={{ d, reload, patchAnswer }}>
+      <SaveBanner />
       <Routes>
         <Route index element={<Navigate to={`m/${firstOpenModule(d)}/0`} replace />} />
         <Route path="m/:moduleKey/:step" element={<ModulePage />} />
@@ -64,4 +66,18 @@ function firstOpenModule(d: Discovery): string {
   const answered = new Set(d.answers.filter((a) => a.status !== 'empty').map((a) => a.question_id));
   const m = d.modules.find((mod) => mod.questions.some((q) => q.kind === 'core' && !q.per_offer && !q.per_persona && !answered.has(q.id)));
   return (m ?? d.modules[0]).key;
+}
+
+// Stays on screen, whatever page the client is on, until every answer has saved.
+function SaveBanner() {
+  const st = useSaveState();
+  const [busy, setBusy] = useState(false);
+  if (!st.failed.length) return null;
+  const n = st.failed.length;
+  return (
+    <div className="save-banner" role="alert">
+      <span><strong>{n === 1 ? "One answer didn't save." : `${n} answers didn't save.`}</strong> Keep this tab open. We'll keep your typing here until it saves.</span>
+      <button type="button" disabled={busy} onClick={async () => { setBusy(true); await saveTracker.retryAll(); setBusy(false); }}>{busy ? 'Trying...' : 'Try again'}</button>
+    </div>
+  );
 }

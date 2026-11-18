@@ -41,6 +41,16 @@ export function createApp() {
     next();
   });
   app.use(express.json({ limit: '200kb' }));
+  // Log failed API calls (method, path, status, short user id; never bodies) so save problems show up in the host's logs.
+  app.use((req, res, next) => {
+    const started = Date.now();
+    res.on('finish', () => {
+      if (res.statusCode < 400 || !req.path.startsWith('/api/') || process.env.NODE_ENV === 'test') return;
+      const who = (req as { user?: { id?: string } }).user?.id?.slice(0, 8) ?? 'anon';
+      console.warn(`[api] ${req.method} ${req.path} ${res.statusCode} ${Date.now() - started}ms user=${who}`);
+    });
+    next();
+  });
   app.use(cookieParser());
   app.use(authMiddleware());
   app.use('/api', rateLimit(300, 60_000));

@@ -27,7 +27,7 @@ export function Welcome() {
         <span className="dictate-icon" aria-hidden="true" />
         <div>
           <h2 id="dictate-h">{DICTATION.heading}</h2>
-          <p>{DICTATION.body}</p>
+          <p>{DICTATION.bodyBefore} <a href={DICTATION.url} target="_blank" rel="noopener noreferrer">{DICTATION.app}<span className="sr-only"> (opens in a new tab)</span></a> {DICTATION.bodyAfter}</p>
         </div>
       </aside>
 

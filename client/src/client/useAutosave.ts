@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api';
+import { saveTracker } from './saveTracker';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
 export type Draft = { value: unknown; status: 'answered' | 'not_sure' | 'discuss' | 'empty' | 'not_applicable'; contextNote: string | null; evidenceStatus?: string | null; reusedFromKey?: string | null };
@@ -13,10 +14,16 @@ export function useAutosave(projectId: string, questionKey: string, offerId: str
   const pending = useRef<Draft | null>(null);
   const timer = useRef<number | null>(null);
   const inFlight = useRef(false);
+  const inFlightPromise = useRef<Promise<void>>(Promise.resolve());
 
+  const key = `${questionKey}|${offerId ?? ''}|${personaId ?? ''}`;
   const flush = useCallback(async (attempt = 0): Promise<void> => {
     if (timer.current) { clearTimeout(timer.current); timer.current = null; }
-    if (inFlight.current || !pending.current) return;
+    if (!pending.current) return;
+    if (inFlight.current) { await inFlightPromise.current; return flush(attempt); }
+    let done!: () => void;
+    inFlightPromise.current = new Promise<void>((r) => { done = r; });
+    if (attempt === 0) saveTracker.track(key, inFlightPromise.current);
     const d = pending.current;
     inFlight.current = true;
     setStatus('saving');
@@ -28,6 +35,7 @@ export function useAutosave(projectId: string, questionKey: string, offerId: str
       rev.current = r.revision;
       if (pending.current === d) pending.current = null;
       setStatus('saved'); setError('');
+      saveTracker.ok(key);
       onSaved(r.revision, d);
     } catch (e) {
       const err = e as ApiError;
@@ -35,13 +43,17 @@ export function useAutosave(projectId: string, questionKey: string, offerId: str
       if (retryable && attempt < 2) {
         inFlight.current = false;
         await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
-        return flush(attempt + 1);
+        try { return await flush(attempt + 1); } finally { done(); }
       }
       setStatus('failed'); setError(err.message);
+      saveTracker.fail(key, err.message, () => flush());
     } finally {
       inFlight.current = false;
+      done();
     }
-    if (pending.current) void flush();
+    // Only go again for newer typing. A failed save waits for "Try again", Continue, or the next keystroke,
+    // so one rejected answer can never loop and trip the server's rate limit for every other answer.
+    if (pending.current && pending.current !== d) void flush();
   }, [projectId, questionKey, offerId, personaId, onSaved]);
 
   const setDraft = useCallback((d: Draft, immediate = false) => {
@@ -51,7 +63,8 @@ export function useAutosave(projectId: string, questionKey: string, offerId: str
     timer.current = window.setTimeout(() => void flush(), immediate ? 0 : 900);
   }, [flush]);
 
-  // Save anything outstanding when the question leaves the screen.
+  // Continue waits on this; anything outstanding also saves when the question leaves the screen.
+  useEffect(() => saveTracker.register(key, () => flush()), [key, flush]);
   useEffect(() => () => { if (pending.current) void flush(); }, [flush]);
 
   return { draft, setDraft, status, error, flush: () => flush(), retry: () => flush() };

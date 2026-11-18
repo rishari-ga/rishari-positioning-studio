@@ -68,7 +68,7 @@ function seedState() {
       a('cc_goal', 'Sell the business, or hand it to the next generation, on good terms.', 'answered', 'customer_reported'),
       a('cc_problem', 'Three years of numbers no one can explain, spread across spreadsheets.', 'answered', 'observed'),
       a('cc_effect', 'Buyers discount the price or walk away late in due diligence.', 'answered', 'customer_reported'),
-      a('pr_prevents', 'They cannot show a buyer clean, trusted numbers.', 'answered', 'observed'),
+      a('pr_affected', 'They cannot show a buyer clean, trusted numbers.', 'answered', 'observed'),
       a('p_work', 'Answers buyer questions late at night with no clear records.', 'answered', 'observed', OWN),
       a('p_personal', 'Worried the family legacy sells for less than it is worth.', 'answered', 'customer_reported', OWN),
       a('p_work', 'Spends month-end fixing spreadsheets by hand.', 'answered', 'observed', OM),

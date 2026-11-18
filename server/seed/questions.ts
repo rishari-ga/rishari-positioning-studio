@@ -66,13 +66,25 @@ const BASE_MODULES: SeedModule[] = [
     ],
   },
   {
-    key: 'origin', title: 'Origin and conviction',
-    why: 'The reason you started can reveal beliefs and details that make the business distinctive.',
+    key: 'origin', title: 'Origin and conviction', revision: 2,
+    why: 'Your why. The reason this business exists is often what makes it different.',
     questions: [
-      core('m2_necessary', 'What happened that made this business feel necessary?'),
+      core('m2_necessary', 'Why did you start this business?', {
+        revision: 2,
+        help: "Tell us the moment, problem, or frustration that made you start it. If you didn't found it, tell us why it was started.",
+        thinking: ['What did you see that others were getting wrong? Who did you want to help?'],
+      }),
       core('m2_name', 'What does the company name mean?'),
-      core('m2_belief', 'What belief shapes how you run the business?'),
-      core('m2_refuse', 'What would you refuse to compromise?'),
+      core('m2_belief', 'How do your beliefs guide the way you run this business?', {
+        revision: 2,
+        help: 'Think about how you price, who you choose to work with, how you treat customers, or how you hire.',
+        thinking: ['For example: "We believe small firms deserve the same tools as big ones, so we keep pricing flat."'],
+      }),
+      core('m2_refuse', 'What will you never do, even if it would win you more business?', {
+        revision: 2,
+        help: 'These are your lines in the sand. Think about shortcuts you won\'t take, clients you\'d turn away, or quality you won\'t cut.',
+        thinking: ['For example: "We won\'t take on a client we can\'t help within 90 days."'],
+      }),
     ],
   },
   {
@@ -131,7 +143,7 @@ const BASE_MODULES: SeedModule[] = [
     questions: [
       core('m8_differently', 'What do you do differently?'),
       core('m8_changes', 'What changes for the customer because of that difference?'),
-      core('m8_today', 'Which differences exist today?'),
+      core('m8_today', 'Which of those differences exist today, and which are still planned?', { revision: 2 }),
       core('m8_planned', 'Which are planned?'),
       core('m8_better_choice', 'When might another option be a better choice?'),
     ],
@@ -166,9 +178,16 @@ const BASE_MODULES: SeedModule[] = [
     questions: [
       core('m11_next', 'What should an interested prospect do next?'),
       core('m11_after', 'What happens after that?'),
-      core('m11_first', 'Where must the new messaging work first?'),
+      core('m11_first', 'Where will you use this messaging first?', {
+        revision: 2,
+        help: 'This tells us what to prepare first.',
+        thinking: ['Your website, a sales deck, a product launch, investor conversations, or outreach emails?'],
+      }),
       core('m11_remain', 'What should remain true as the offers evolve?'),
-      core('m11_working', 'What customer response would suggest the message is working?'),
+      core('m11_working', 'How will you know the new messaging is working?', {
+        revision: 2,
+        thinking: ['More booked calls, shorter sales conversations, or customers repeating your words back to you?'],
+      }),
     ],
   },
 ];
@@ -262,9 +281,9 @@ const NARRATIVE: Record<string, SeedQuestion[]> = {
     pr('n_transform_not', 'n_transform', 'What would they no longer want to be known for?', { field: 'transformation.before', allowNA: true }),
   ],
   credibility: [
-    oc('n_guide_empathy', 'What do you understand about their situation that helps them feel understood?', {
-      perOffer: false, field: 'guide.empathy',
-      help: 'People need to feel understood and have a truthful reason to feel confident taking the next step.',
+    oc('n_guide_empathy', 'What do you understand about your customers\' situation that others miss?', {
+      perOffer: false, field: 'guide.empathy', revision: 2,
+      help: 'Show that you know what they deal with. Think about what they put up with, what they have already tried, or what they worry about but rarely say.',
     }),
     oc('n_guide_service', 'How does that understanding affect the way you serve them?', { perOffer: false, field: 'guide.empathy_in_practice' }),
     oc('n_guide_credibility', 'What can you truthfully show or explain that gives them confidence in your ability to help?', {
@@ -316,8 +335,9 @@ const pp = (key: string, of: string, prompt: string, extra: Partial<SeedQuestion
 
 const PERSONA_MODULES: SeedModule[] = [
   {
-    key: 'customer_company', title: 'Your customer company',
+    key: 'customer_company', title: 'Your customer company', revision: 2,
     why: "Describe the business most likely to benefit from your product or service. We'll look at the people inside it next.",
+    opening: "Sell directly to consumers, not to businesses? Skip this chapter. You'll describe your customers in the next one.",
     questions: [
       { key: 'cc_groups', kind: 'customer_groups', input: 'customer_groups', allowNotSure: false, field: 'company.type',
         prompt: 'What type of company are you focusing on first?',
@@ -337,7 +357,8 @@ const PERSONA_MODULES: SeedModule[] = [
     questions: [
       { key: 'cp_personas', kind: 'personas', input: 'personas', allowNotSure: false, field: 'personas',
         prompt: 'Who are the main personas?',
-        help: "Add one persona at a time. Name each one by role, like \"Operations manager.\" You don't need made-up names, ages, or personal details. One persona can play several parts in the purchase.",
+        revision: 2,
+        help: "Add one persona at a time. If you sell to businesses, name each one by role, like \"Operations manager.\" If you sell to consumers, name them by situation, like \"First-time homebuyer.\" You don't need made-up names, ages, or personal details.",
         reuseFrom: ['m6_roles'] },
     ],
   },
@@ -361,13 +382,13 @@ const PERSONA_MODULES: SeedModule[] = [
     ],
   },
   {
-    key: 'solution', title: 'Your solution and plan',
-    why: 'Connect each problem to the product or service that addresses it. Then explain how the customer moves from the problem to a better outcome.',
+    key: 'solution', title: 'Your solution and plan', revision: 2,
+    why: 'This chapter is about the fix: what you provide and how it deals with the problem. The next chapter asks about the result.',
     questions: [
-      { key: 'sl_company', kind: 'solution_links', input: 'solution_links', allowNotSure: false, field: 'company.solution',
+      { key: 'sl_company', kind: 'solution_links', input: 'solution_links', allowNotSure: false, revision: 2, field: 'company.solution',
         part: 'Part A: How your product or service helps',
         prompt: 'Which product or service addresses this company problem?',
-        help: "Add a connection for each product or service that helps. If nothing you offer fits yet, say so. That's useful to know." },
+        help: "Name the product or service and what it does about the problem. Example: \"Records Audit checks every client file and flags what's missing.\" Save the results for the next chapter. If nothing you offer fits yet, say so." },
       { key: 'sl_persona', kind: 'solution_links', input: 'solution_links', allowNotSure: false, perPersona: true, field: 'persona.solution',
         part: 'Part A: How your product or service helps', heading: 'How you help {persona}',
         prompt: 'Which product or service helps this persona?',
@@ -376,8 +397,16 @@ const PERSONA_MODULES: SeedModule[] = [
         part: "Part B: The customer's plan", field: 'plan.steps', evidence: false, reuseFrom: ['n_plan_steps'],
         help: "Explain what the customer does and what you do to put the solution to work. Describe what the customer experiences, not a list of features. Use as many steps as it really takes.",
       }),
-      cq('pl_we', 'What does your company handle?', { part: "Part B: The customer's plan", field: 'plan.we_handle', evidence: false, reuseFrom: ['n_plan_roles'] }),
-      cq('pl_customer', 'What does the customer company need to do?', { part: "Part B: The customer's plan", field: 'plan.customer_does', evidence: false }),
+      cq('pl_we', 'What work does your team do to deliver it?', {
+        part: "Part B: The customer's plan", field: 'plan.we_handle', evidence: false, reuseFrom: ['n_plan_roles'], revision: 2,
+        help: 'List the work your side takes on, so the customer knows what they will not have to do.',
+        thinking: ['For example: "We set up the portal, import your client list, and train your staff in one session."'],
+      }),
+      cq('pl_customer', 'What does the customer have to do to make it work?', {
+        part: "Part B: The customer's plan", field: 'plan.customer_does', evidence: false, revision: 2,
+        help: "Their side of the work. Include time, people, or information they need to provide. If they don't need to do anything, say so.",
+        thinking: ['For example: "Upload last year\'s files and name one person to own the process."'],
+      }),
       { key: 'pl_personas', kind: 'persona_fields', input: 'persona_fields', allowNotSure: true, field: 'persona.plan_role',
         part: "Part B: The customer's plan", prompt: 'What does each relevant persona need to do?',
         help: "One shared plan is usually enough. Note only what each persona does. Leave a persona blank if they don't take part." },
@@ -388,12 +417,19 @@ const PERSONA_MODULES: SeedModule[] = [
     ],
   },
   {
-    key: 'success', title: 'What success looks like',
-    why: "Describe the better outcome you are working toward. You don't need measured results yet. We'll separate expected benefits from results you have already seen.",
+    key: 'success', title: 'What success looks like', revision: 2,
+    why: "Last chapter was the fix. This one is the result: what is better once it works. Describe the outcome, not what you do. You don't need measured results yet.",
     questions: [
-      cq('sc_company', 'If this works, what improves for the customer company?', { field: 'company.success', reuseFrom: ['n_success_business'] }),
+      cq('sc_company', 'Once it is working, what is better for the customer company?', {
+        field: 'company.success', reuseFrom: ['n_success_business'], revision: 2,
+        help: 'Describe the result, not your product. If your answer names a feature or a task you do, it belongs in the last chapter.',
+        thinking: ['Fix: "We flag missing files." Result: "Year-end closes two weeks earlier, with no weekend work."'],
+      }),
       cq('sc_signal', 'How would the company recognize success?', { field: 'company.success_signals', reuseFrom: ['n_success_signal'] }),
-      pq('sp_do', 'What can this persona do more easily or effectively?', { heading: 'What success looks like for {persona}', field: 'persona.success' }),
+      pq('sp_do', 'Once it is working, what can this persona do that they could not do before?', {
+        heading: 'What success looks like for {persona}', field: 'persona.success', revision: 2,
+        help: 'Describe their better day, not the product. What do they stop doing, or finally get to do?',
+      }),
       pp('sp_team', 'sp_do', 'What might their manager or team notice?', { perPersona: true, field: 'persona.success_team' }),
       pp('sp_measures', 'sp_do', 'What measures do they already use?', { perPersona: true, field: 'persona.success_measures' }),
       pp('sp_needs', 'sp_do', 'What needs to happen for this outcome to be possible?', { perPersona: true, field: 'persona.success_dependencies' }),
@@ -425,9 +461,20 @@ export const RETIRED_QUESTIONS = [
   'n_fail_continue', 'n_fail_harder', 'n_fail_observed', 'n_fail_support', 'n_fail_overstate', 'n_fail_who', 'n_fail_prevent',
   'n_success_business', 'n_success_team', 'n_success_colleagues', 'n_success_outside', 'n_success_horizon', 'n_success_person', 'n_success_signal', 'n_success_measures',
   'n_plan_steps', 'n_plan_how', 'n_plan_roles', 'n_plan_onboarding', 'n_plan_support', 'n_plan_commit', 'n_plan_learn', 'n_plan_limits',
+  // Question bank review, Nov 2026: cut overlap so every question asks something new.
+  'm1_outcomes',                  // replaced by "Where will you use this messaging first?"
+  'm1_available', 'm1_developing', // the products and services list already records what is available and what is planned
+  'm7_instead', 'm7_why',         // asked per product or service in "If a customer did not choose..." and its follow-ups
+  'm8_planned',                   // merged into m8_today
+  'm9_confident',                 // same as "What can you truthfully show or explain..."
+  'm11_next', 'm11_after',        // asked per product or service in the action questions
+  'm11_remain',                   // too abstract to answer well
+  'pr_prevents',                  // same as "How does that problem affect the business?"
+  'n_result_first', 'n_result_needs', 'n_transform', 'n_transform_not', // covered by "What success looks like"
 ];
 
-const ORDER = ['business', 'origin', 'offers', 'customer_company', 'customer_personas', 'problems', 'solution', 'success', 'nothing_changes',
+// Story order: who they are, what is wrong, what it costs to leave it, the fix, the result, then how you compare.
+const ORDER = ['business', 'origin', 'offers', 'customer_company', 'customer_personas', 'problems', 'nothing_changes', 'solution', 'success',
   'alternatives', 'differentiation', 'credibility', 'voice', 'action'];
 
 const withNarrative: SeedModule[] = BASE_MODULES.map((m) => ({ ...m, questions: [...m.questions, ...(NARRATIVE[m.key] ?? [])] }));

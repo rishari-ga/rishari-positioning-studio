@@ -9,6 +9,7 @@ import { useDiscovery } from './ProjectRoutes';
 import { useAutosave } from './useAutosave';
 import type { Draft, SaveStatus } from './useAutosave';
 import { FollowupBox } from './Followups';
+import { DICTATION } from '@shared/content';
 import wordmarkWhite from '../assets/wordmark-white@2x.png';
 
 export type Step =
@@ -177,7 +178,7 @@ function textOf(d: Discovery, key: string): string | null {
 }
 
 const CONTEXT: Record<string, ('goal' | 'problem' | 'offers' | 'benefit')[]> = {
-  pr_prevents: ['problem'], p_work: ['goal', 'problem'], sl_company: ['goal', 'problem'], sl_persona: ['goal', 'problem'],
+  cc_effect: ['problem'], p_work: ['goal', 'problem'], sl_company: ['goal', 'problem'], sl_persona: ['goal', 'problem'],
   sc_company: ['goal', 'problem', 'offers'], sp_do: ['goal', 'problem', 'offers', 'benefit'], nc_keep: ['problem'], np_keep: ['problem'],
 };
 
@@ -218,6 +219,10 @@ export function ModulePage() {
         <p className="eyebrow">Step {si + 1} of {steps.length}{offer ? <> &middot; {offer.name}</> : null}{persona ? <> &middot; {persona.role_title}</> : null}</p>
         <h1 ref={headingRef} tabIndex={-1} className="chapter-title">{m.title}</h1>
         {si === 0 ? <p className="why">{m.why}{m.opening ? <><br />{m.opening}</> : null}</p> : <p className="why-short">{m.why}</p>}
+        {si === 0 && m.key === 'customer_company' && (
+          <p className="skip-row"><Link className="button secondary" to={`/p/${d.project.id}/m/customer_personas/0`}>We sell to consumers. Skip this chapter.</Link></p>
+        )}
+        {si === 0 && mi === 0 && <p className="dictate-tip"><strong>Tip:</strong> {DICTATION.short}</p>}
         {m.key === 'customer_company' && si === 0 && <Definitions />}
         {['customer_personas', 'problems', 'solution', 'success', 'nothing_changes'].includes(m.key) && si === 0 && <Definitions compact />}
         {needsPersonas && si === 0 && (

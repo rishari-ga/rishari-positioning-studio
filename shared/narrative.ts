@@ -102,7 +102,6 @@ export const NARRATIVE_SECTIONS: { key: string; title: string; scope: SectionSco
     { key: 'company.goal', label: 'Goal', important: true },
     { key: 'company.problem', label: 'Problem', important: true },
     { key: 'company.problem_effect', label: 'Effect on the business' },
-    { key: 'company.prevents', label: 'What it prevents' },
     { key: 'company.solution', label: 'Product or service that helps', important: true },
     { key: 'company.success', label: 'Success', important: true },
     { key: 'company.success_signals', label: 'How success is recognized' },
@@ -131,10 +130,8 @@ export const NARRATIVE_SECTIONS: { key: string; title: string; scope: SectionSco
     { key: 'guide.credibility', label: 'Credibility', important: true }] },
   { key: 'offer', title: 'By product or service', scope: 'offer', fields: [
     { key: 'alternatives.offer', label: 'Alternatives', important: true },
-    { key: 'immediate_result.change', label: 'First observable change' },
     { key: 'action.direct', label: 'Ready-now action', important: true },
-    { key: 'action.transitional', label: 'Not-ready-yet step' },
-    { key: 'transformation.after', label: 'Transformation', optional: true }] },
+    { key: 'action.transitional', label: 'Not-ready-yet step' }] },
 ];
 
 function linkCoverage(links: SolutionLink[]): { status: Coverage; reason: string } {

@@ -102,8 +102,8 @@ describe('AI foundation', () => {
   it('keeps working when AI is off: answers save, follow-ups and summaries step aside, admin tasks explain why', async () => {
     config.ai.enabled = false;
     const c = await as(CLIENT);
-    await put(c, pid, 'pr_prevents', { value: 'They cannot plan staff because files arrive late.', status: 'answered' }).expect(200);
-    expect((await c.post(`/api/projects/${pid}/followups/next`).send({ questionKey: 'pr_prevents' }).expect(200)).body.followup).toBeNull();
+    await put(c, pid, 'pr_affected', { value: 'They cannot plan staff because files arrive late.', status: 'answered' }).expect(200);
+    expect((await c.post(`/api/projects/${pid}/followups/next`).send({ questionKey: 'pr_affected' }).expect(200)).body.followup).toBeNull();
     expect((await c.get(`/api/projects/${pid}/summaries/customer_company?generate=1`).expect(200)).body.status).toBe('unavailable');
     const admin = await as(ADMIN);
     const r = await admin.post(`/api/admin/projects/${pid}/ai-review`).expect(503);
@@ -131,7 +131,7 @@ describe('AI foundation', () => {
   it('retries once on writing problems, then fixes dashes safely without touching quotes', async () => {
     script.summary = (_r, n) => ({ summary: n === 1 ? 'You help firms — a game-changing idea.' : 'You help firms — small ones.', interpretations: [], openQuestions: [] });
     const c = await as(CLIENT);
-    await put(c, pid, 'pr_prevents', { value: 'Late files stop them from planning staff for the busy season.', status: 'answered' }).expect(200);
+    await put(c, pid, 'pr_affected', { value: 'Late files stop them from planning staff for the busy season.', status: 'answered' }).expect(200);
     const r = (await c.get(`/api/projects/${pid}/summaries/problems?generate=1`).expect(200)).body;
     expect(counts.summary).toBe(2);
     expect(calls[1].input).toMatch(/Writing issues found/);
@@ -198,8 +198,8 @@ describe('client follow-ups', () => {
 
   it('only follows up on answered core questions, and respects "not needed"', async () => {
     const c = await as(CLIENT);
-    await put(c, pid, 'pr_prevents', { value: null, status: 'not_sure' }).expect(200);
-    expect((await c.post(`/api/projects/${pid}/followups/next`).send({ questionKey: 'pr_prevents' }).expect(200)).body.followup).toBeNull();
+    await put(c, pid, 'cc_effect', { value: null, status: 'not_sure' }).expect(200);
+    expect((await c.post(`/api/projects/${pid}/followups/next`).send({ questionKey: 'cc_effect' }).expect(200)).body.followup).toBeNull();
     script.followup = () => ({ needed: false, kind: 'example', question: '' });
     await put(c, pid, 'np_keep', { value: 'Weeks of chasing documents every spring.', status: 'answered' }, `?personaId=${ops}`).expect(200);
     expect((await c.post(`/api/projects/${pid}/followups/next`).send({ questionKey: 'np_keep', personaId: ops }).expect(200)).body.followup).toBeNull();

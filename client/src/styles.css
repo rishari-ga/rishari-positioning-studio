@@ -607,3 +607,12 @@ th, .flow-label, .tile-label, .side-label, .review-label, .crumb-tag { font-size
 @media (max-width: 760px) {
   table.stack td::before { text-transform: none; letter-spacing: 0.01em; font-size: 0.78rem; }
 }
+
+/* Dictation tip and the consumer skip */
+.dictate-card { display: grid; grid-template-columns: auto 1fr; gap: 1rem; background: var(--grey); border-radius: var(--radius-md); padding: 1.25rem 1.4rem; margin: 2rem 0 0; border-left: 3px solid var(--cyan); }
+.dictate-card h2 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+.dictate-card p { margin: 0; }
+.dictate-icon { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: var(--black) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ccff' stroke-width='2' stroke-linecap='round'%3E%3Crect x='9' y='3' width='6' height='11' rx='3'/%3E%3Cpath d='M5 11a7 7 0 0 0 14 0M12 18v3'/%3E%3C/svg%3E") center / 1.1rem no-repeat; }
+.dictate-tip { font-size: 0.9rem; color: var(--caption); background: var(--grey); border-radius: var(--radius-md); padding: 0.65rem 0.9rem; margin: 0 0 1.5rem; }
+.skip-row { margin: 0 0 1.5rem; }
+.dictate-card { margin-bottom: 1.5rem; }

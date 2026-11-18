@@ -65,7 +65,7 @@ describe('data migration', () => {
     expect(persona).toEqual({ role_title: 'Office manager', purchase_roles: expect.arrayContaining(['uses', 'recommends']), goal: 'Fewer late nights', needs_confirmation: true });
     expect((await pool.query("SELECT active FROM question_modules WHERE key='buying'")).rows[0].active).toBe(false);
     const order = (await pool.query('SELECT key FROM question_modules WHERE active ORDER BY position')).rows.map((r) => r.key);
-    expect(order.slice(0, 9)).toEqual(['business', 'origin', 'offers', 'customer_company', 'customer_personas', 'problems', 'solution', 'success', 'nothing_changes']);
+    expect(order.slice(0, 9)).toEqual(['business', 'origin', 'offers', 'customer_company', 'customer_personas', 'problems', 'nothing_changes', 'solution', 'success']);
     expect((await pool.query("SELECT title FROM question_modules WHERE key='business'")).rows[0].title).toBe('Your company');
   });
 });

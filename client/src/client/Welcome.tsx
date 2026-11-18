@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { WELCOME, ACK } from '@shared/content';
+import { WELCOME, ACK, DICTATION } from '@shared/content';
 import { api } from '../api';
 import { useDiscovery } from './ProjectRoutes';
 import { Hero } from './Hero';
@@ -22,6 +22,14 @@ export function Welcome() {
 
       <h2>Before you begin</h2>
       <ul className="squares">{WELCOME.beforeYouBegin.map((t) => <li key={t}>{t}</li>)}</ul>
+
+      <aside className="dictate-card" aria-labelledby="dictate-h">
+        <span className="dictate-icon" aria-hidden="true" />
+        <div>
+          <h2 id="dictate-h">{DICTATION.heading}</h2>
+          <p>{DICTATION.body}</p>
+        </div>
+      </aside>
 
       <p className="small"><Link to="/data-use">How we use your information</Link> &middot; <Link to="/contact">Contact Rishari</Link></p>
 
